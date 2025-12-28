@@ -4,8 +4,8 @@ This document outlines the next phases of development for SpeechD-NG, focused on
 
 ## Current Status
 
-**Phases 1-10**: ✅ Complete
-- Core D-Bus service, TTS engines, STT, LLM integration, wake word, passive learning, **manual training**, **import/export**
+**Phases 1-11**: ✅ Complete
+- Core D-Bus service, TTS engines, STT, LLM integration, wake word, passive learning, **manual training**, **import/export**, **ignored commands**
 
 ---
 
@@ -103,7 +103,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Imp
 
 ---
 
-## Phase 11: Ignored Commands Tracking
+## Phase 11: Ignored Commands Tracking ✅ COMPLETE
 
 **Goal**: Track failed/unrecognized commands for later manual correction.
 
@@ -114,20 +114,23 @@ When the LLM can't resolve an ASR transcription to a meaningful command, store i
 
 ### Implementation Steps
 
-#### 11.1 Track Failures in Fingerprint
-- [ ] Add `ignored_commands: Vec<IgnoredCommand>` to FingerprintData
-- [ ] `IgnoredCommand { heard: String, timestamp: String, context: String }`
-- [ ] Cap at 50 most recent
+#### 11.1 Track Failures in Fingerprint ✅
+- [x] Add `ignored_commands: Vec<IgnoredCommand>` to FingerprintData
+- [x] `IgnoredCommand { heard: String, timestamp: String, context: String }`
+- [x] Cap at 50 most recent
+- [x] Duplicate detection (don't add same command twice)
 
-#### 11.2 API Methods
-- [ ] `GetIgnoredCommands() -> Vec<(heard: String, timestamp: String)>`
-- [ ] `ClearIgnoredCommands() -> bool`
-- [ ] `CorrectIgnoredCommand(heard: String, meant: String) -> bool`
-  - Adds correction and removes from ignored list
+#### 11.2 API Methods ✅
+- [x] `GetIgnoredCommands() -> Vec<(heard: String, timestamp: String, context: String)>`
+- [x] `ClearIgnoredCommands() -> u32` (returns count cleared)
+- [x] `CorrectIgnoredCommand(heard: String, meant: String) -> bool`
+  - Removes from ignored list and adds as manual correction
+- [x] `AddIgnoredCommand(heard: String, context: String)`
+  - For testing/debugging
 
-#### 11.3 Integration
-- [ ] Cortex marks commands as "ignored" when LLM returns low confidence
-- [ ] Fingerprint auto-saves ignored commands
+#### 11.3 Integration ✅
+- [x] Cortex auto-adds commands when LLM returns "confused" or error responses
+- [x] Fingerprint auto-saves ignored commands with timestamps
 
 ### Files to Modify
 - `src/fingerprint.rs` - Add IgnoredCommand struct and methods
@@ -211,7 +214,7 @@ wyoming_auto_start = true
 |-------|---------|-----------|--------|
 | 9 | Manual Voice Training | 2-3 hours | ✅ Complete |
 | 10 | Pattern Import/Export | 1 hour | ✅ Complete |
-| 11 | Ignored Commands | 1-2 hours | 📋 Planned |
+| 11 | Ignored Commands | 1-2 hours | ✅ Complete |
 | 12 | Improved VAD | 2-3 hours | 📋 Planned |
 | 13 | Wyoming Protocol | 4-6 hours | 📋 Future |
 

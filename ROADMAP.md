@@ -77,11 +77,13 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **ImportFingerprint**: Load/merge patterns from file.
 -   [x] **GetFingerprintPath**: Get path to fingerprint data file.
 
-## Phase 11: Ignored Commands Tracking (📋 Planned)
+## Phase 11: Ignored Commands Tracking (✅ Completed)
 **Goal**: Track failed commands for later correction.
--   [ ] **Ignored Commands List**: Store unrecognized ASR outputs.
--   [ ] **GetIgnoredCommands**: D-Bus API to retrieve failures.
--   [ ] **CorrectIgnoredCommand**: Fix errors and add to fingerprint.
+-   [x] **IgnoredCommand Struct**: Tracked with heard, timestamp, context.
+-   [x] **GetIgnoredCommands**: D-Bus API to retrieve failed ASR attempts.
+-   [x] **CorrectIgnoredCommand**: Fix errors and add to fingerprint patterns.
+-   [x] **ClearIgnoredCommands**: Clear all ignored commands.
+-   [x] **Auto-Integration**: Cortex auto-adds commands when LLM is confused.
 
 ## Phase 12: Improved VAD (📋 Planned)
 **Goal**: Smarter speech detection for natural conversation.

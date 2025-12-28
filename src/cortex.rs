@@ -137,6 +137,16 @@ impl Cortex {
                         // 2. Passive Learning: If we had ASR text and LLM returned something different, learn it
                         if let Some(ref asr) = asr_heard {
                             fingerprint.passive_learn(asr, &answer);
+                            
+                            // 3. Track confused/failed responses as ignored commands
+                            let answer_lower = answer.to_lowercase();
+                            if answer_lower.contains("confused") 
+                                || answer_lower.contains("don't understand")
+                                || answer_lower.contains("unclear")
+                                || answer_lower.contains("could not")
+                                || answer_lower.contains("brain offline") {
+                                fingerprint.add_ignored_command(asr, "LLM confusion");
+                            }
                         }
 
                         let _ = response_tx.send(answer).await;

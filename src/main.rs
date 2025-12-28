@@ -232,6 +232,31 @@ impl SpeechService {
     async fn get_fingerprint_path(&self) -> String {
         self.fingerprint.get_path()
     }
+
+    // ========== Phase 11: Ignored Commands Tracking ==========
+
+    /// Get all ignored commands (heard, timestamp, context)
+    async fn get_ignored_commands(&self) -> Vec<(String, String, String)> {
+        self.fingerprint.get_ignored_commands()
+    }
+
+    /// Clear all ignored commands
+    /// Returns count of commands cleared
+    async fn clear_ignored_commands(&self) -> u32 {
+        self.fingerprint.clear_ignored_commands()
+    }
+
+    /// Correct an ignored command - removes from ignored list and adds as pattern
+    /// Returns true if the command was found and corrected
+    async fn correct_ignored_command(&self, heard: String, meant: String) -> bool {
+        println!("Correcting ignored command: '{}' -> '{}'", heard, meant);
+        self.fingerprint.correct_ignored_command(&heard, &meant)
+    }
+
+    /// Manually add a command to the ignored list (for testing/debugging)
+    async fn add_ignored_command(&self, heard: String, context: String) {
+        self.fingerprint.add_ignored_command(&heard, &context)
+    }
 }
 
 #[tokio::main]

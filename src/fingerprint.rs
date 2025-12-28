@@ -13,10 +13,20 @@ pub struct Pattern {
     pub source: String,  // "passive" or "manual"
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct IgnoredCommand {
+    pub heard: String,
+    pub timestamp: String,
+    #[serde(default)]
+    pub context: String,  // Optional context about where it failed
+}
+
 #[derive(Serialize, Deserialize, Default)]
 pub struct FingerprintData {
     pub patterns: HashMap<String, Pattern>,
     pub command_history: Vec<String>,
+    #[serde(default)]
+    pub ignored_commands: Vec<IgnoredCommand>,
 }
 
 #[derive(Clone)]
@@ -257,6 +267,81 @@ impl Fingerprint {
     /// Get the path to the fingerprint file
     pub fn get_path(&self) -> String {
         self.path.to_string_lossy().to_string()
+    }
+
+    // ========== Phase 11: Ignored Commands ==========
+
+    /// Add a command that couldn't be understood (for later correction)
+    pub fn add_ignored_command(&self, heard: &str, context: &str) {
+        if heard.is_empty() {
+            return;
+        }
+
+        let mut data = self.data.lock().unwrap();
+        
+        // Don't add duplicates (check last 10)
+        let recent: Vec<_> = data.ignored_commands.iter().rev().take(10).collect();
+        if recent.iter().any(|c| c.heard == heard) {
+            return;
+        }
+
+        let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        
+        data.ignored_commands.push(IgnoredCommand {
+            heard: heard.to_string(),
+            timestamp,
+            context: context.to_string(),
+        });
+
+        // Cap at 50 most recent
+        if data.ignored_commands.len() > 50 {
+            data.ignored_commands.remove(0);
+        }
+
+        self.save(&data);
+        println!("Fingerprint: Added ignored command '{}' (context: {})", heard, context);
+    }
+
+    /// Get all ignored commands for review
+    pub fn get_ignored_commands(&self) -> Vec<(String, String, String)> {
+        let data = self.data.lock().unwrap();
+        data.ignored_commands.iter()
+            .map(|c| (c.heard.clone(), c.timestamp.clone(), c.context.clone()))
+            .collect()
+    }
+
+    /// Clear all ignored commands
+    pub fn clear_ignored_commands(&self) -> u32 {
+        let mut data = self.data.lock().unwrap();
+        let count = data.ignored_commands.len() as u32;
+        data.ignored_commands.clear();
+        self.save(&data);
+        println!("Fingerprint: Cleared {} ignored commands", count);
+        count
+    }
+
+    /// Correct an ignored command - adds it as a pattern and removes from ignored
+    /// Returns true if the command was found and corrected
+    pub fn correct_ignored_command(&self, heard: &str, meant: &str) -> bool {
+        let mut data = self.data.lock().unwrap();
+        
+        // Find and remove from ignored list
+        let original_len = data.ignored_commands.len();
+        data.ignored_commands.retain(|c| c.heard.to_lowercase() != heard.to_lowercase());
+        let removed = original_len != data.ignored_commands.len();
+
+        if removed {
+            // Drop the lock before calling add_manual_correction
+            drop(data);
+            
+            // Add as a manual correction
+            self.add_manual_correction(heard.to_string(), meant.to_string());
+            println!("Fingerprint: Corrected ignored '{}' -> '{}'", heard, meant);
+            true
+        } else {
+            println!("Fingerprint: Ignored command '{}' not found", heard);
+            false
+        }
     }
 
     fn save(&self, data: &FingerprintData) {

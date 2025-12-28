@@ -119,7 +119,7 @@ impl Ear {
 
                 println!("Ear: Starting bridge at path: {:?}", bridge_path);
 
-                let mut child = Command::new("python3")
+                let mut child = match Command::new("python3")
                     .arg(&bridge_path)
                     .arg(&model_path)
                     .arg(&wake_word)
@@ -127,12 +127,33 @@ impl Ear {
                     .stdin(Stdio::piped())
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
-                    .spawn()
-                    .expect("Failed to start wakeword bridge");
+                    .spawn() {
+                        Ok(c) => c,
+                        Err(e) => {
+                            eprintln!("Ear: Failed to start wakeword bridge: {}. Retrying in 30s...", e);
+                            thread::sleep(Duration::from_secs(30));
+                            continue;
+                        }
+                    };
 
-                let mut stdin = child.stdin.take().expect("Failed to open bridge stdin");
-                let stdout = child.stdout.take().expect("Failed to open bridge stdout");
-                let stderr = child.stderr.take().expect("Failed to open bridge stderr");
+                let mut stdin = if let Some(s) = child.stdin.take() { s } else {
+                    eprintln!("Ear: Failed to open bridge stdin. Retrying in 30s...");
+                    let _ = child.kill();
+                    thread::sleep(Duration::from_secs(30));
+                    continue;
+                };
+                let stdout = if let Some(s) = child.stdout.take() { s } else {
+                    eprintln!("Ear: Failed to open bridge stdout. Retrying in 30s...");
+                    let _ = child.kill();
+                    thread::sleep(Duration::from_secs(30));
+                    continue;
+                };
+                let stderr = if let Some(s) = child.stderr.take() { s } else {
+                    eprintln!("Ear: Failed to open bridge stderr. Retrying in 30s...");
+                    let _ = child.kill();
+                    thread::sleep(Duration::from_secs(30));
+                    continue;
+                };
                 let mut bridge_reader = BufReader::new(stdout);
 
                 // Spawn a thread to forward stderr to our logs
@@ -151,7 +172,7 @@ impl Ear {
 
                 let mut last_pulse = std::time::Instant::now();
 
-                let stream = device.build_input_stream(
+                let stream_result = device.build_input_stream(
                     &config.clone().into(),
                     move |data: &[f32], _: &_| {
                         if running_clone.load(std::sync::atomic::Ordering::SeqCst) {
@@ -172,9 +193,24 @@ impl Ear {
                     },
                     |err| println!("Wake word stream error: {}", err),
                     None
-                ).expect("Failed to build background stream");
+                );
 
-                stream.play().expect("Failed to start stream");
+                let stream = match stream_result {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("Ear: Failed to build background stream: {}. Standing by...", e);
+                        let _ = child.kill();
+                        thread::sleep(Duration::from_secs(30));
+                        continue;
+                    }
+                };
+
+                if let Err(e) = stream.play() {
+                    eprintln!("Ear: Failed to start stream: {}. Standing by...", e);
+                    let _ = child.kill();
+                    thread::sleep(Duration::from_secs(30));
+                    continue;
+                }
 
                 let mut line = String::new();
                 if let Ok(_) = bridge_reader.read_line(&mut line) {
@@ -260,7 +296,7 @@ impl Ear {
         let buffer = Arc::new(Mutex::new(Vec::new()));
         let buffer_clone = buffer.clone();
 
-        let stream = device.build_input_stream(
+        let stream_result = device.build_input_stream(
             &config.clone().into(),
             move |data: &[f32], _: &_| {
                 if let Ok(mut b) = buffer_clone.lock() {
@@ -271,12 +307,20 @@ impl Ear {
                 eprintln!("Ear: Recording stream error: {}", err);
             },
             None
-        ).map_err(|e| {
-            eprintln!("Ear: Failed to build recording stream: {}", e);
-            e
-        }).expect("Failed to build stream");
+        );
 
-        stream.play().unwrap();
+        let stream = match stream_result {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("Ear: Failed to build recording stream: {}", e);
+                return format!("Error: Failed to build recording stream: {}", e);
+            }
+        };
+
+        if let Err(e) = stream.play() {
+            eprintln!("Ear: Failed to start recording stream: {}", e);
+            return format!("Error: Failed to start recording stream: {}", e);
+        }
         thread::sleep(Duration::from_secs(seconds));
         drop(stream);
 
@@ -347,7 +391,7 @@ impl Ear {
         let samples_per_chunk = (sample_rate as usize * channels as usize) / 100;
         let mut chunk_buffer = Vec::with_capacity(samples_per_chunk);
         
-        let stream = device.build_input_stream(
+        let stream_result = device.build_input_stream(
             &config.clone().into(),
             move |data: &[f32], _: &_| {
                 chunk_buffer.extend_from_slice(data);
@@ -414,9 +458,20 @@ impl Ear {
                 eprintln!("Ear: VAD stream error: {}", err);
             },
             None
-        ).expect("Failed to build VAD stream");
+        );
+
+        let stream = match stream_result {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("Ear: Failed to build VAD stream: {}", e);
+                return format!("Error: Failed to build VAD stream: {}", e);
+            }
+        };
         
-        stream.play().unwrap();
+        if let Err(e) = stream.play() {
+            eprintln!("Ear: Failed to start VAD stream: {}", e);
+            return format!("Error: Failed to start VAD stream: {}", e);
+        }
         
         // Wait for VAD to complete or timeout
         let start = std::time::Instant::now();

@@ -25,6 +25,7 @@ struct SpeechService {
 
 #[interface(name = "org.speech.Service")]
 impl SpeechService {
+    #[zbus(name = "Speak")]
     async fn speak(&self, #[zbus(header)] _header: Header<'_>, text: String) {
         println!("Received speak request: {}", text);
         
@@ -43,6 +44,7 @@ impl SpeechService {
         }
     }
 
+    #[zbus(name = "SpeakVoice")]
     async fn speak_voice(&self, #[zbus(header)] _header: Header<'_>, text: String, voice: String) {
          println!("Received speak request (voice: {}): {}", voice, text);
          
@@ -61,6 +63,7 @@ impl SpeechService {
          }
     }
 
+    #[zbus(name = "ListVoices")]
     async fn list_voices(&self) -> Vec<(String, String)> {
         let engine = if let Ok(engine) = self.engine.lock() {
              Some(engine.clone())
@@ -76,6 +79,7 @@ impl SpeechService {
         }
     }
 
+    #[zbus(name = "ListDownloadableVoices")]
     async fn list_downloadable_voices(&self) -> Vec<(String, String)> {
         let engine = if let Ok(engine) = self.engine.lock() {
              Some(engine.clone())
@@ -91,6 +95,7 @@ impl SpeechService {
         }
     }
 
+    #[zbus(name = "DownloadVoice")]
     async fn download_voice(&self, #[zbus(header)] header: Header<'_>, voice_id: String) -> String {
         if let Err(e) = SecurityAgent::check_permission(&header, "org.speech.service.manage").await {
             return format!("Access Denied: {}", e);
@@ -112,6 +117,7 @@ impl SpeechService {
         }
     }
 
+    #[zbus(name = "Think")]
     async fn think(&self, #[zbus(header)] header: Header<'_>, query: String) -> String {
         if let Err(e) = SecurityAgent::check_permission(&header, "org.speech.service.think").await {
             eprintln!("Access Denied: {}", e);
@@ -130,6 +136,7 @@ impl SpeechService {
         self.cortex.query(query).await
     }
 
+    #[zbus(name = "Listen")]
     async fn listen(&self, #[zbus(header)] header: Header<'_>) -> String {
         if let Err(e) = SecurityAgent::check_permission(&header, "org.speech.service.listen").await {
             eprintln!("Access Denied: {}", e);
@@ -155,6 +162,7 @@ impl SpeechService {
 
     /// Listen with Voice Activity Detection (Phase 12)
     /// Waits for speech, records until silence, then transcribes
+    #[zbus(name = "ListenVad")]
     async fn listen_vad(&self, #[zbus(header)] header: Header<'_>) -> String {
         if let Err(e) = SecurityAgent::check_permission(&header, "org.speech.service.listen").await {
             eprintln!("Access Denied: {}", e);
@@ -182,18 +190,21 @@ impl SpeechService {
 
     /// Add a manual voice correction (heard -> meant)
     /// This is used when the user knows what ASR mishears
+    #[zbus(name = "AddCorrection")]
     async fn add_correction(&self, heard: String, meant: String) -> bool {
         println!("Adding manual correction: '{}' -> '{}'", heard, meant);
         self.fingerprint.add_manual_correction(heard, meant)
     }
 
     /// Undo the last correction (manual or passive)
+    #[zbus(name = "RollbackLastCorrection")]
     async fn rollback_last_correction(&self) -> bool {
         self.fingerprint.rollback_last_correction()
     }
 
     /// Train a word by recording user speech and learning what ASR hears
     /// Returns (what_asr_heard, success)
+    #[zbus(name = "TrainWord")]
     async fn train_word(&self, #[zbus(header)] header: Header<'_>, expected: String, duration_secs: u32) -> (String, bool) {
         if let Err(e) = SecurityAgent::check_permission(&header, "org.speech.service.train").await {
             eprintln!("Access Denied for TrainWord: {}", e);
@@ -240,11 +251,13 @@ impl SpeechService {
     }
 
     /// Get fingerprint statistics (manual_patterns, passive_patterns, command_count)
+    #[zbus(name = "GetFingerprintStats")]
     async fn get_fingerprint_stats(&self) -> (u32, u32, u32) {
         self.fingerprint.get_stats()
     }
 
     /// List all learned patterns (for debugging/UI)
+    #[zbus(name = "ListPatterns")]
     async fn list_patterns(&self) -> Vec<(String, String, String)> {
         self.fingerprint.get_all_patterns()
             .into_iter()
@@ -305,6 +318,7 @@ impl SpeechService {
     // ========== Phase 13: Wyoming Protocol ==========
 
     /// Get current STT backend ("vosk" or "wyoming")
+    #[zbus(name = "GetSttBackend")]
     async fn get_stt_backend(&self) -> String {
         config_loader::SETTINGS.read().unwrap().stt_backend.clone()
     }

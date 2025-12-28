@@ -69,7 +69,9 @@ impl SpeechBackend for EspeakBackend {
             cmd.arg("-v").arg(v);
         }
         
-        cmd.arg(text)
+        // Use -- to separate flags from text
+        cmd.arg("--")
+           .arg(text)
            .stdout(Stdio::piped())
            .stderr(Stdio::piped());
 

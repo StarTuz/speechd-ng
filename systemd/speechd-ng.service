@@ -41,10 +41,12 @@ PrivateDevices=true
 
 # Network: Allow localhost (Ollama) and Hugging Face (Piper downloads)
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-IPAddressAllow=localhost
-IPAddressAllow=huggingface.co
-IPAddressAllow=cdn-lfs.huggingface.co
-IPAddressDeny=any
+# IPAddressAllow/Deny does not support domain names in systemd!
+# To allow downloads, we must allow all outgoing traffic or use a proxy.
+# IPAddressAllow=localhost
+# IPAddressAllow=huggingface.co
+# IPAddressAllow=cdn-lfs.huggingface.co
+# IPAddressDeny=any
 
 # Restrict system calls to common set
 SystemCallArchitectures=native

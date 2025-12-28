@@ -3,8 +3,10 @@ mod cortex;
 mod config_loader;
 mod security;
 mod backends;
+mod ear;
 use engine::AudioEngine;
 use cortex::Cortex;
+use ear::Ear;
 use security::SecurityAgent;
 use std::error::Error;
 use std::future::pending;
@@ -14,6 +16,7 @@ use zbus::{interface, connection::Builder, message::Header};
 struct SpeechService {
     engine: Arc<Mutex<AudioEngine>>,
     cortex: Cortex,
+    ear: Arc<Mutex<Ear>>,
 }
 
 #[interface(name = "org.speech.Service")]
@@ -82,16 +85,42 @@ impl SpeechService {
         println!("Received thought query: {}", query);
         self.cortex.query(query).await
     }
+
+    async fn listen(&self, #[zbus(header)] header: Header<'_>) -> String {
+        // STRICT SECURITY: Listening activates the microphone. Must be authenticated.
+        if let Err(e) = SecurityAgent::check_permission(&header, "org.speech.service.listen").await {
+            eprintln!("Access Denied: {}", e);
+            return "Access Denied".to_string();
+        }
+
+        println!("Received listen request");
+        
+        // Offload blocking audio capture to a dedicated thread to avoid starving the async runtime
+        let ear = self.ear.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            if let Ok(ear_guard) = ear.lock() {
+                ear_guard.listen()
+            } else {
+                "Error: Ear locked".to_string()
+            }
+        }).await;
+
+        match result {
+            Ok(s) => s,
+            Err(e) => format!("Error joining audio task: {}", e),
+        }
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let engine = Arc::new(Mutex::new(AudioEngine::new()));
     let cortex = Cortex::new();
+    let ear = Arc::new(Mutex::new(Ear::new()));
 
     let _conn = Builder::session()?
         .name("org.speech.Service")?
-        .serve_at("/org/speech/Service", SpeechService { engine, cortex })?
+        .serve_at("/org/speech/Service", SpeechService { engine, cortex, ear })?
         .build()
         .await?;
 

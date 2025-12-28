@@ -5,8 +5,11 @@ edition = "2024"
 
 [dependencies]
 config = "0.15.19"
+cpal = "0.17.0"
+hound = "3.5.1"
 lazy_static = "1.5.0"
 reqwest = { version = "0.12.28", features = ["json"] }
+ringbuf = "0.4.9"
 rodio = "0.17.3"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.148"

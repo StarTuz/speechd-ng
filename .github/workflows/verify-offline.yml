@@ -35,16 +35,16 @@ jobs:
     - name: Setup Dummy Config (Broken Network)
       run: |
         mkdir -p ~/.config/speechd-ng
-        # Use sed to strip leading spaces from the heredoc to ensure clean TOML
-        sed 's/^        //' <<EOF > ~/.config/speechd-ng/Speech.toml
-        ollama_url = "http://192.0.2.1:12345"
-        ollama_model = "void"
-        enable_ai = true
-        passive_confidence_threshold = 0.1
-        piper_model = "en_US-lessac-medium"
-        tts_backend = "espeak"
-        enable_audio = false
-        EOF
+        # Use simple echo for TOML to avoid indentation/sed issues
+        echo 'ollama_url = "http://192.0.2.1:12345"' > ~/.config/speechd-ng/Speech.toml
+        echo 'ollama_model = "void"' >> ~/.config/speechd-ng/Speech.toml
+        echo 'enable_ai = true' >> ~/.config/speechd-ng/Speech.toml
+        echo 'passive_confidence_threshold = 0.1' >> ~/.config/speechd-ng/Speech.toml
+        echo 'piper_model = "en_US-lessac-medium"' >> ~/.config/speechd-ng/Speech.toml
+        echo 'tts_backend = "espeak"' >> ~/.config/speechd-ng/Speech.toml
+        echo 'enable_audio = false' >> ~/.config/speechd-ng/Speech.toml
+        echo "Config created at ~/.config/speechd-ng/Speech.toml"
+        cat ~/.config/speechd-ng/Speech.toml
 
     - name: Start Daemon (Background)
       run: |
@@ -61,6 +61,7 @@ jobs:
         
         # Wrap everything in dbus-run-session so we have a bus
         dbus-run-session -- bash -c '
+          export RUST_BACKTRACE=1
           # 1. Start Daemon with output captured
           echo "Starting Daemon [Session Bus: $DBUS_SESSION_BUS_ADDRESS]..."
           ./target/release/speechserverdaemon > daemon.log 2>&1 &

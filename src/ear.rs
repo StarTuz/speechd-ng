@@ -244,11 +244,12 @@ impl Ear {
                     }
                 }
             }
-            let device = if let Some(d) = selected.or_else(|| host.default_input_device()) {
+            if let Some(d) = selected.or_else(|| host.default_input_device()) {
                 d
             } else {
                 return "Error: No input device available".to_string();
-            };
+            }
+        };
 
         println!("Ear: Recording command from device: {:?}", device.name().ok());
         let config = match device.default_input_config() {

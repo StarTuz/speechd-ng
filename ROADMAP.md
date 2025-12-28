@@ -56,3 +56,39 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **Passive Learning Loop**: Automatically learn from LLM-corrected transcription errors.
 -   [x] **Contextual Prompt Injection**: Dynamically inject learned patterns into LLM system prompts for better interpretation.
 -   [x] **Local Privacy**: All learning data remains private and local to the user's home directory.
+
+---
+
+## Future Phases (Planned)
+
+> See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for detailed implementation steps.
+
+## Phase 9: Manual Voice Training (📋 Planned)
+**Goal**: Explicit user-driven voice training for problematic words.
+-   [ ] **TrainWord D-Bus Method**: Record user saying a word, learn ASR error patterns.
+-   [ ] **AddCorrection D-Bus Method**: Directly add correction without recording.
+-   [ ] **Training Feedback**: Speak confirmation of what was learned.
+
+## Phase 10: Pattern Import/Export (📋 Planned)
+**Goal**: Share and backup voice patterns.
+-   [ ] **ExportFingerprint**: Save learned patterns to file.
+-   [ ] **ImportFingerprint**: Load/merge patterns from file.
+-   [ ] **GetFingerprintStats**: Quick overview of learning status.
+
+## Phase 11: Ignored Commands Tracking (📋 Planned)
+**Goal**: Track failed commands for later correction.
+-   [ ] **Ignored Commands List**: Store unrecognized ASR outputs.
+-   [ ] **GetIgnoredCommands**: D-Bus API to retrieve failures.
+-   [ ] **CorrectIgnoredCommand**: Fix errors and add to fingerprint.
+
+## Phase 12: Improved VAD (📋 Planned)
+**Goal**: Smarter speech detection for natural conversation.
+-   [ ] **Energy-Based VAD**: Detect speech start/end by audio energy.
+-   [ ] **Configurable Thresholds**: Speech/silence levels, timeouts.
+-   [ ] **Natural Recording**: Record only when user is speaking.
+
+## Phase 13: Wyoming Protocol (📋 Future)
+**Goal**: Remote ASR via Wyoming protocol for better accuracy.
+-   [ ] **Wyoming Client**: Stream audio to wyoming-whisper servers.
+-   [ ] **Auto-Start Server**: Launch local Whisper server if needed.
+-   [ ] **GPU Acceleration**: Support for remote GPU-powered transcription.

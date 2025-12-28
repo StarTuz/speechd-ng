@@ -99,7 +99,14 @@ impl Ear {
                 };
 
                 println!("Ear: Device acquired: {:?}, Backend: {:?}", device.name().ok(), host.id());
-                let config = device.default_input_config().expect("Failed to get config");
+                let config = match device.default_input_config() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        eprintln!("Ear: Failed to get input config: {}. Standing by...", e);
+                        thread::sleep(Duration::from_secs(30));
+                        continue;
+                    }
+                };
                 println!("Ear: Config acquired.");
                 
                 let sample_rate: u32 = config.sample_rate().into();
@@ -237,11 +244,17 @@ impl Ear {
                     }
                 }
             }
-            selected.or_else(|| host.default_input_device()).expect("No input device")
-        };
+            let device = if let Some(d) = selected.or_else(|| host.default_input_device()) {
+                d
+            } else {
+                return "Error: No input device available".to_string();
+            };
 
         println!("Ear: Recording command from device: {:?}", device.name().ok());
-        let config = device.default_input_config().expect("No config");
+        let config = match device.default_input_config() {
+            Ok(c) => c,
+            Err(_) => return "Error: Failed to get input config".to_string(),
+        };
         let sample_rate: u32 = config.sample_rate().into();
 
         let buffer = Arc::new(Mutex::new(Vec::new()));
@@ -302,13 +315,20 @@ impl Ear {
         };
         
         let host = cpal::default_host();
-        let device = host.default_input_device().expect("No input device");
+        let device = if let Some(d) = host.default_input_device() {
+            d
+        } else {
+            return "Error: No input device found".to_string();
+        };
         
         println!("Ear: VAD recording from device: {:?}", device.name().ok());
         println!("Ear: VAD thresholds - speech: {}, silence: {}, timeout: {}ms, max: {}ms", 
             speech_threshold, silence_threshold, silence_duration_ms, max_duration_ms);
         
-        let config = device.default_input_config().expect("No config");
+        let config = match device.default_input_config() {
+            Ok(c) => c,
+            Err(_) => return "Error: No audio config available".to_string(),
+        };
         let sample_rate: u32 = config.sample_rate().into();
         let channels = config.channels();
         

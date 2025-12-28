@@ -56,7 +56,11 @@ impl Cortex {
     pub fn new() -> Self {
         let (tx, mut rx) = channel::<CortexMessage>(100);
         let memory = Arc::new(Mutex::new(Memory::new()));
-        let client = Client::new();
+        let client = Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(2))
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .unwrap_or_else(|_| Client::new());
 
         let fingerprint = Fingerprint::new();
 

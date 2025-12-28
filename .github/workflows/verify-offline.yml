@@ -20,7 +20,7 @@ jobs:
     - name: Install System Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libasound2-dev libdbus-1-dev pkg-config libsystemd-dev dbus python3-dbus alsa-utils
+        sudo apt-get install -y libasound2-dev libdbus-1-dev pkg-config libsystemd-dev dbus python3-dbus alsa-utils dbus-x11 libdbus-glib-1-dev
 
     - name: Install Rust
       uses: actions-rs/toolchain@v1
@@ -64,8 +64,8 @@ jobs:
           # 2. Wait for service to appear on bus (up to 30s)
           echo "Waiting for org.speech.Service to appear on bus..."
           for i in {1..30}; do
-            if busctl status org.speech.Service >/dev/null 2>&1; then
-               echo "Service is UP after $i seconds."
+            if busctl list | grep -q "org.speech.Service"; then
+               echo "Service is UP and owning name after $i seconds."
                break
             fi
             if ! kill -0 $DAEMON_PID 2>/dev/null; then

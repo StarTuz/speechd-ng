@@ -70,6 +70,8 @@ impl Settings {
             // Connect to defaults
             .set_default("ollama_url", "http://localhost:11434")?
             .set_default("ollama_model", "llama3")?
+            .set_default("enable_ai", true)?
+            .set_default("passive_confidence_threshold", 0.1)?
             .set_default("piper_model", "en_US-lessac-medium")?
             .set_default("piper_binary", "piper")?
             .set_default("tts_backend", "espeak")?

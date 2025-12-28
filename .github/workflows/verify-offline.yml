@@ -41,8 +41,10 @@ jobs:
         ollama_url = "http://192.0.2.1:12345" 
         ollama_model = "void"
         enable_ai = true
+        passive_confidence_threshold = 0.1
         piper_model = "en_US-lessac-medium"
         tts_backend = "espeak" 
+        enable_audio = false
         EOF
 
     - name: Start Daemon (Background)
@@ -54,8 +56,9 @@ jobs:
     
     - name: Run Resilience Test
       run: |
-        # Ensure we have a runtime dir for D-Bus/Alsa if needed
-        export XDG_RUNTIME_DIR=/tmp
+        # Ensure we have a runtime dir for D-Bus/Alsa owned by runner user
+        mkdir -p /home/runner/runtime
+        export XDG_RUNTIME_DIR=/home/runner/runtime
         
         # Wrap everything in dbus-run-session so we have a bus
         dbus-run-session -- bash -c '

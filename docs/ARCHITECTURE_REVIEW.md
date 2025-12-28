@@ -52,7 +52,7 @@
 
 ## 7. Action Items (Future Roadmap)
 - [ ] Create `.deb` / `.rpm` packaging scripts.
-- [ ] Add `enable_ai = false` config option. (✅ Completed)
-- [ ] Implement `Rollback` and specialized "Safety" UI.
+- [x] Add `enable_ai = false` config option. (✅ Completed)
+- [x] Implement `Rollback` and specialized "Safety" UI. (✅ Completed)
 - [ ] Benchmark suite for latency measurements.
 - [ ] **CI**: Add explicit offline-mode test (network disabled, Ollama unreachable) to verification pipeline.

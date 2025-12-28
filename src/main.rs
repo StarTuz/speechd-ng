@@ -306,12 +306,21 @@ impl SpeechService {
 
     /// Get current STT backend ("vosk" or "wyoming")
     async fn get_stt_backend(&self) -> String {
-        crate::config_loader::SETTINGS.read()
-            .map(|s| s.stt_backend.clone())
-            .unwrap_or_else(|_| "vosk".to_string())
+        config_loader::SETTINGS.read().unwrap().stt_backend.clone()
     }
 
-    /// Get Wyoming server info (host, port, model)
+    /// Returns diagnostic status: (ai_enabled, passive_threshold, stt_backend, total_patterns)
+    async fn get_status(&self) -> (bool, f32, String, u32) {
+        let (ai, thresh, stt) = {
+            let s = config_loader::SETTINGS.read().unwrap();
+            (s.enable_ai, s.passive_confidence_threshold, s.stt_backend.clone())
+        };
+        
+        let (m, p, _) = self.fingerprint.get_stats();
+        (ai, thresh, stt, m + p)
+    }
+
+    /// Returns Wyoming connection info: (host, port, model, auto_start)
     async fn get_wyoming_info(&self) -> (String, u16, String, bool) {
         let settings = crate::config_loader::SETTINGS.read().unwrap();
         (

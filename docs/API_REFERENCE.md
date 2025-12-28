@@ -352,6 +352,16 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 
 ---
 
+### `GetStatus() → (bool, f32, String, u32)`
+
+Returns a diagnostic summary:
+1. `ai_enabled` (bool): Is the LLM active?
+2. `passive_threshold` (f32): Confidence threshold for passive learning.
+3. `stt_backend` (String): Current STT backend.
+4. `patterns_count` (u32): Total number of learned voice patterns.
+
+---
+
 ### `GetWyomingInfo() → (host: String, port: u16, model: String, auto_start: bool)`
 
 Get configuration details for the Wyoming protocol integration.

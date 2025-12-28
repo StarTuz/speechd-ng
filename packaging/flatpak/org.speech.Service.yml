@@ -1,0 +1,33 @@
+app-id: org.speech.Service
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+command: speechserverdaemon
+finish-args:
+  # D-Bus Service Export
+  - --socket=session-bus
+  - --own-name=org.speech.Service
+  
+  # Network (Ollama, Piper downloads)
+  - --share=network
+  
+  # Audio
+  - --socket=pulseaudio
+  
+  # Data Persistence
+  - --filesystem=xdg-data/speechd-ng:create
+  - --filesystem=xdg-config/speechd-ng:create
+
+modules:
+  - name: speechd-ng
+    buildsystem: simple
+    build-commands:
+      - install -D speechserverdaemon /app/bin/speechserverdaemon
+      - install -D src/wakeword_bridge.py /app/lib/speechd-ng/wakeword_bridge.py
+      - install -D src/wyoming_bridge.py /app/lib/speechd-ng/wyoming_bridge.py
+    sources:
+      # In real usage, this would point to the release tarball / git repo
+      - type: dir
+        path: ../../target/release/
+      - type: dir
+        path: ../../src/

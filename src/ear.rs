@@ -4,8 +4,33 @@ use std::thread;
 use std::time::Duration;
 use std::process::{Command, Stdio};
 use std::io::{Write, BufRead, BufReader};
+use wait_timeout::ChildExt;
 use crate::engine::AudioEngine;
 use crate::cortex::Cortex;
+
+/// Helper to find bridge scripts in dev, local, or system paths
+fn find_bridge_script(script_name: &str) -> std::path::PathBuf {
+    // 1. Next to executable
+    if let Ok(mut exe_path) = std::env::current_exe() {
+        exe_path.pop();
+        let local_path = exe_path.join(script_name);
+        if local_path.exists() { return local_path; }
+        
+        // 2. Development (target/debug/../../src)
+        let mut p = exe_path.clone();
+        p.pop(); p.pop();
+        let src_path = p.join("src").join(script_name);
+        if src_path.exists() { return src_path; }
+    }
+
+    // 3. System install path
+    let sys_path = std::path::PathBuf::from("/usr/lib/speechd-ng").join(script_name);
+    if sys_path.exists() { return sys_path; }
+
+    // 4. Legacy fallback
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    std::path::PathBuf::from(format!("{}/Code/speechserverdaemon/src/{}", home, script_name))
+}
 
 pub struct Ear;
 
@@ -28,26 +53,8 @@ impl Ear {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
         let model_path = format!("{}/.cache/vosk/vosk-model-small-en-us-0.15", home);
 
-        // Try to find the bridge near the binary first, or in Source dir
-        let bridge_path = if let Ok(mut exe_path) = std::env::current_exe() {
-            exe_path.pop(); // remove binary name
-            let local_bridge = exe_path.join("wakeword_bridge.py");
-            if local_bridge.exists() {
-                local_bridge
-            } else {
-                // Check if we are in target/debug
-                let mut p = exe_path.clone();
-                p.pop(); p.pop();
-                let src_bridge = p.join("src/wakeword_bridge.py");
-                if src_bridge.exists() {
-                    src_bridge
-                } else {
-                    std::path::PathBuf::from(format!("{}/Code/speechserverdaemon/src/wakeword_bridge.py", home))
-                }
-            }
-        } else {
-            std::path::PathBuf::from(format!("{}/Code/speechserverdaemon/src/wakeword_bridge.py", home))
-        };
+        // Find bridge script
+        let bridge_path = find_bridge_script("wakeword_bridge.py");
 
         thread::spawn(move || {
             println!("Ear: Autonomous mode active. Watching for '{}'...", wake_word);
@@ -472,25 +479,7 @@ impl Ear {
         println!("Ear: [Wyoming] Transcribing via {}:{}", host, port);
 
         // Find the Wyoming bridge script
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        let bridge_path = if let Ok(mut exe_path) = std::env::current_exe() {
-            exe_path.pop();
-            let local_bridge = exe_path.join("wyoming_bridge.py");
-            if local_bridge.exists() {
-                local_bridge
-            } else {
-                let mut p = exe_path.clone();
-                p.pop(); p.pop();
-                let src_bridge = p.join("src/wyoming_bridge.py");
-                if src_bridge.exists() {
-                    src_bridge
-                } else {
-                    std::path::PathBuf::from(format!("{}/Code/speechserverdaemon/src/wyoming_bridge.py", home))
-                }
-            }
-        } else {
-            std::path::PathBuf::from(format!("{}/Code/speechserverdaemon/src/wyoming_bridge.py", home))
-        };
+        let bridge_path = find_bridge_script("wyoming_bridge.py");
 
         // Convert WAV to raw PCM 16-bit mono 16kHz for Wyoming
         let pcm_path = wav_path.replace(".wav", ".pcm");

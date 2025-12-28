@@ -37,8 +37,8 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **Voice Enumeration**: D-Bus API to list available voices (`ListVoices`).
 -   [x] **Voice Selection**: `SpeakVoice()` method to speak with a specific voice ID.
 
-## Phase 6: Input & Accessibility (🚧 In Progress)
+## Phase 6: Input & Accessibility (✅ Completed)
 **Goal**: Two-way interaction (The "Ears").
 -   [x] **Microphone Stream**: Secure access to mic via `cpal`.
 -   [x] **Speech-to-Text (STT)**: Integration with Whisper (CLI).
--   [ ] **Orca Compatibility**: Shim to pretend to be `speech-dispatcher` for legacy app support.
+-   [x] **Orca Compatibility**: Shim to pretend to be `speech-dispatcher` for legacy app support.

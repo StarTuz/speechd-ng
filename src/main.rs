@@ -4,6 +4,7 @@ mod config_loader;
 mod security;
 mod backends;
 mod ear;
+mod ssip;
 use engine::AudioEngine;
 use cortex::Cortex;
 use ear::Ear;
@@ -120,11 +121,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let _conn = Builder::session()?
         .name("org.speech.Service")?
-        .serve_at("/org/speech/Service", SpeechService { engine, cortex, ear })?
+        .serve_at("/org/speech/Service", SpeechService { engine: engine.clone(), cortex, ear })?
         .build()
         .await?;
 
     println!("Speech Service running at org.speech.Service");
+
+    // Start SSIP Shim (Legacy Compatibility)
+    let ssip_engine = engine.clone();
+    tokio::spawn(async move {
+        ssip::start_server(ssip_engine).await;
+    });
 
     // Keep the service running
     pending::<()>().await;

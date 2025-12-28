@@ -139,6 +139,31 @@ impl SpeechService {
         }
     }
 
+    /// Listen with Voice Activity Detection (Phase 12)
+    /// Waits for speech, records until silence, then transcribes
+    async fn listen_vad(&self, #[zbus(header)] header: Header<'_>) -> String {
+        if let Err(e) = SecurityAgent::check_permission(&header, "org.speech.service.listen").await {
+            eprintln!("Access Denied: {}", e);
+            return "Access Denied".to_string();
+        }
+
+        println!("Received VAD listen request");
+        
+        let ear = self.ear.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            if let Ok(ear_guard) = ear.lock() {
+                ear_guard.record_with_vad()
+            } else {
+                "Error: Ear locked".to_string()
+            }
+        }).await;
+
+        match result {
+            Ok(s) => s,
+            Err(e) => format!("Error joining audio task: {}", e),
+        }
+    }
+
     // ========== Phase 9: Voice Training API ==========
 
     /// Add a manual voice correction (heard -> meant)

@@ -106,13 +106,39 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Thi
 
 ### `Listen() → String`
 
-Record audio and transcribe it using STT.
+Record audio and transcribe it using STT (fixed 4-second duration).
 
 ```bash
 busctl --user call org.speech.Service /org/speech/Service org.speech.Service Listen
 ```
 
 **Returns:** Transcribed text.
+
+---
+
+### `ListenVad() → String` (Phase 12)
+
+Record audio with Voice Activity Detection - waits for speech, records until silence.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service ListenVad
+```
+
+**Returns:** Transcribed text.
+
+**Notes:**
+- Waits for speech to begin (doesn't record initial silence)
+- Automatically ends when user stops speaking
+- Uses configurable energy thresholds
+- More natural than fixed-duration recording
+
+**Configuration** (`~/.config/speechd-ng/Speech.toml`):
+```toml
+vad_speech_threshold = 500      # Energy level to detect speech start
+vad_silence_threshold = 400     # Energy level to detect silence
+vad_silence_duration_ms = 1500  # Silence duration before ending
+vad_max_duration_ms = 15000     # Maximum recording length
+```
 
 ---
 

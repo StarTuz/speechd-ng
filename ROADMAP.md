@@ -85,11 +85,13 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **ClearIgnoredCommands**: Clear all ignored commands.
 -   [x] **Auto-Integration**: Cortex auto-adds commands when LLM is confused.
 
-## Phase 12: Improved VAD (📋 Planned)
+## Phase 12: Improved VAD (✅ Completed)
 **Goal**: Smarter speech detection for natural conversation.
--   [ ] **Energy-Based VAD**: Detect speech start/end by audio energy.
--   [ ] **Configurable Thresholds**: Speech/silence levels, timeouts.
--   [ ] **Natural Recording**: Record only when user is speaking.
+-   [x] **Energy-Based VAD**: Detect speech start/end by audio energy (RMS).
+-   [x] **Configurable Thresholds**: Speech/silence levels, timeouts in config.
+-   [x] **Natural Recording**: Record only when user is speaking.
+-   [x] **ListenVad D-Bus Method**: New API for VAD-based listening.
+-   [x] **Wake Word Integration**: Autonomous mode uses VAD.
 
 ## Phase 13: Wyoming Protocol (📋 Future)
 **Goal**: Remote ASR via Wyoming protocol for better accuracy.

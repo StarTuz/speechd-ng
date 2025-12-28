@@ -14,6 +14,11 @@ pub struct Settings {
     pub enable_audio: bool,
     pub wake_word: String,
     pub enable_wake_word: bool,
+    // VAD Settings (Phase 12)
+    pub vad_speech_threshold: i16,
+    pub vad_silence_threshold: i16,
+    pub vad_silence_duration_ms: u64,
+    pub vad_max_duration_ms: u64,
 }
 
 impl Default for Settings {
@@ -28,6 +33,11 @@ impl Default for Settings {
             enable_audio: true,
             wake_word: "startuz".to_string(),
             enable_wake_word: false,
+            // VAD defaults
+            vad_speech_threshold: 500,
+            vad_silence_threshold: 400,
+            vad_silence_duration_ms: 1500,
+            vad_max_duration_ms: 15000,
         }
     }
 }
@@ -51,6 +61,11 @@ impl Settings {
             .set_default("enable_audio", true)?
             .set_default("wake_word", "startuz")?
             .set_default("enable_wake_word", false)?
+            // VAD defaults
+            .set_default("vad_speech_threshold", 500)?
+            .set_default("vad_silence_threshold", 400)?
+            .set_default("vad_silence_duration_ms", 1500)?
+            .set_default("vad_max_duration_ms", 15000)?
             // Merge with local config file (if exists)
             .add_source(File::with_name("Speech").required(false))
             .add_source(File::with_name(&format!("{}/.config/speechd-ng/Speech", std::env::var("HOME").unwrap_or_default())).required(false))

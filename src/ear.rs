@@ -171,10 +171,10 @@ impl Ear {
                             });
                         }
 
-                        // 2. Capture Command
+                        // 2. Capture Command (using VAD for natural recording)
                         let ear = Ear::new();
-                        let command = ear.record_and_transcribe(4);
-                        println!("Ear: Command heard: '{}'", command);
+                        let command = ear.record_with_vad();
+                        println!("Ear: Command heard (VAD): '{}'", command);
 
                         if !command.trim().is_empty() {
                             // 3. Think & Respond
@@ -184,6 +184,11 @@ impl Ear {
                             
                             if let Ok(e) = engine.lock() {
                                 e.speak(&response, None);
+                            }
+                        } else {
+                            // No speech detected
+                            if let Ok(e) = engine.lock() {
+                                e.speak("I didn't hear anything.", None);
                             }
                         }
                     }
@@ -195,7 +200,7 @@ impl Ear {
         });
     }
 
-    /// Record audio for specified duration and transcribe it
+    /// Record audio for specified duration and transcribe it (fallback, fixed duration)
     pub fn record_and_transcribe(&self, seconds: u64) -> String {
         let path = "/tmp/recorded_speech.wav";
         
@@ -265,6 +270,166 @@ impl Ear {
         self.transcribe_cli(path).unwrap_or_else(|e| format!("STT Error: {}", e))
     }
 
+    /// Record audio with VAD (Voice Activity Detection)
+    /// Starts recording when speech is detected, stops after silence
+    pub fn record_with_vad(&self) -> String {
+        let path = "/tmp/recorded_speech_vad.wav";
+        
+        // Get VAD settings
+        let (speech_threshold, silence_threshold, silence_duration_ms, max_duration_ms) = {
+            let settings = crate::config_loader::SETTINGS.read().unwrap();
+            (
+                settings.vad_speech_threshold,
+                settings.vad_silence_threshold,
+                settings.vad_silence_duration_ms,
+                settings.vad_max_duration_ms,
+            )
+        };
+        
+        let host = cpal::default_host();
+        let device = host.default_input_device().expect("No input device");
+        
+        println!("Ear: VAD recording from device: {:?}", device.name().ok());
+        println!("Ear: VAD thresholds - speech: {}, silence: {}, timeout: {}ms, max: {}ms", 
+            speech_threshold, silence_threshold, silence_duration_ms, max_duration_ms);
+        
+        let config = device.default_input_config().expect("No config");
+        let sample_rate: u32 = config.sample_rate().into();
+        let channels = config.channels();
+        
+        // Shared state for VAD
+        let buffer = Arc::new(Mutex::new(Vec::<f32>::new()));
+        let vad_state = Arc::new(Mutex::new(VadState::Waiting));
+        let speech_started = Arc::new(Mutex::new(std::time::Instant::now()));
+        let silence_started = Arc::new(Mutex::new(Option::<std::time::Instant>::None));
+        
+        let buffer_clone = buffer.clone();
+        let vad_state_clone = vad_state.clone();
+        let speech_started_clone = speech_started.clone();
+        let silence_started_clone = silence_started.clone();
+        
+        // Calculate samples per chunk for energy calculation (10ms chunks)
+        let samples_per_chunk = (sample_rate as usize * channels as usize) / 100;
+        let mut chunk_buffer = Vec::with_capacity(samples_per_chunk);
+        
+        let stream = device.build_input_stream(
+            &config.clone().into(),
+            move |data: &[f32], _: &_| {
+                chunk_buffer.extend_from_slice(data);
+                
+                // Process complete chunks
+                while chunk_buffer.len() >= samples_per_chunk {
+                    let chunk: Vec<f32> = chunk_buffer.drain(..samples_per_chunk).collect();
+                    
+                    // Calculate RMS energy (convert f32 to i16 scale for threshold comparison)
+                    let energy: f32 = (chunk.iter().map(|s| s * s).sum::<f32>() / chunk.len() as f32).sqrt();
+                    let energy_i16 = (energy * 32768.0) as i16;
+                    
+                    let mut state = vad_state_clone.lock().unwrap();
+                    let now = std::time::Instant::now();
+                    
+                    match *state {
+                        VadState::Waiting => {
+                            if energy_i16 > speech_threshold {
+                                println!("Ear: [VAD] Speech detected! (energy: {})", energy_i16);
+                                *state = VadState::Speaking;
+                                *speech_started_clone.lock().unwrap() = now;
+                                // Start buffering audio
+                                if let Ok(mut b) = buffer_clone.lock() {
+                                    b.extend_from_slice(&chunk);
+                                }
+                            }
+                        }
+                        VadState::Speaking => {
+                            // Always buffer audio during speaking state
+                            if let Ok(mut b) = buffer_clone.lock() {
+                                b.extend_from_slice(&chunk);
+                            }
+                            
+                            // Check for silence
+                            if energy_i16 < silence_threshold {
+                                let mut silence = silence_started_clone.lock().unwrap();
+                                if silence.is_none() {
+                                    *silence = Some(now);
+                                } else if let Some(start) = *silence {
+                                    if now.duration_since(start).as_millis() >= silence_duration_ms as u128 {
+                                        println!("Ear: [VAD] Silence detected, ending recording");
+                                        *state = VadState::Done;
+                                    }
+                                }
+                            } else {
+                                // Reset silence timer if speech resumes
+                                *silence_started_clone.lock().unwrap() = None;
+                            }
+                            
+                            // Check max duration
+                            let speech_start = *speech_started_clone.lock().unwrap();
+                            if now.duration_since(speech_start).as_millis() >= max_duration_ms as u128 {
+                                println!("Ear: [VAD] Max duration reached");
+                                *state = VadState::Done;
+                            }
+                        }
+                        VadState::Done => {
+                            // Stop processing
+                        }
+                    }
+                }
+            },
+            move |err| {
+                eprintln!("Ear: VAD stream error: {}", err);
+            },
+            None
+        ).expect("Failed to build VAD stream");
+        
+        stream.play().unwrap();
+        
+        // Wait for VAD to complete or timeout
+        let start = std::time::Instant::now();
+        let timeout = Duration::from_millis(max_duration_ms + 5000); // Extra 5s for startup
+        
+        loop {
+            thread::sleep(Duration::from_millis(50));
+            
+            let state = vad_state.lock().unwrap();
+            if *state == VadState::Done {
+                break;
+            }
+            
+            if start.elapsed() > timeout {
+                println!("Ear: [VAD] Timeout waiting for speech");
+                break;
+            }
+        }
+        
+        drop(stream);
+        
+        // Write captured audio to file
+        let captured_data = buffer.lock().unwrap();
+        
+        if captured_data.is_empty() {
+            println!("Ear: [VAD] No audio captured");
+            return String::new();
+        }
+        
+        println!("Ear: [VAD] Captured {} samples", captured_data.len());
+        
+        let spec = hound::WavSpec {
+            channels,
+            sample_rate,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
+        };
+
+        if let Ok(mut writer) = hound::WavWriter::create(path, spec) {
+            for &sample in captured_data.iter() {
+                let _ = writer.write_sample(sample);
+            }
+            let _ = writer.finalize();
+        }
+
+        self.transcribe_cli(path).unwrap_or_else(|e| format!("STT Error: {}", e))
+    }
+
     fn transcribe_cli(&self, path: &str) -> Result<String, String> {
         let txt_path = path.replace(".wav", ".txt");
         let output = Command::new("vosk-transcriber")
@@ -280,4 +445,12 @@ impl Ear {
         }
         Err("Vosk transcriber failed".to_string())
     }
+}
+
+// VAD State Machine
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum VadState {
+    Waiting,   // Waiting for speech to start
+    Speaking,  // Speech detected, recording
+    Done,      // Recording complete
 }

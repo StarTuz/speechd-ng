@@ -4,8 +4,8 @@ This document outlines the next phases of development for SpeechD-NG, focused on
 
 ## Current Status
 
-**Phases 1-11**: ✅ Complete
-- Core D-Bus service, TTS engines, STT, LLM integration, wake word, passive learning, **manual training**, **import/export**, **ignored commands**
+**Phases 1-12**: ✅ Complete
+- Core D-Bus service, TTS engines, STT, LLM integration, wake word, passive learning, **manual training**, **import/export**, **ignored commands**, **VAD**
 
 ---
 
@@ -139,7 +139,7 @@ When the LLM can't resolve an ASR transcription to a meaningful command, store i
 
 ---
 
-## Phase 12: Improved Voice Activity Detection (VAD)
+## Phase 12: Improved Voice Activity Detection (VAD) ✅ COMPLETE
 
 **Goal**: Smarter speech detection for more natural listening experience.
 
@@ -150,23 +150,29 @@ Replace fixed 4-second recording with energy-based VAD that starts when speech i
 
 ### Implementation Steps
 
-#### 12.1 VAD Parameters (Configurable)
+#### 12.1 VAD Parameters (Configurable) ✅
 ```toml
 # Speech.toml
 vad_speech_threshold = 500      # Energy level to detect speech start
-vad_silence_threshold = 500     # Energy level to detect silence
+vad_silence_threshold = 400     # Energy level to detect silence
 vad_silence_duration_ms = 1500  # How long to wait before ending
-vad_max_duration_ms = 10000     # Maximum recording length
+vad_max_duration_ms = 15000     # Maximum recording length
 ```
 
-#### 12.2 Implement in Ear Module
-- [ ] Replace `record_and_transcribe(seconds)` with `record_until_silence()`
-- [ ] Calculate RMS energy per audio chunk
-- [ ] State machine: WAITING → SPEAKING → SILENCE_DETECTED → DONE
+#### 12.2 Implement in Ear Module ✅
+- [x] Add `record_with_vad()` function alongside `record_and_transcribe()`
+- [x] Calculate RMS energy per 10ms audio chunk
+- [x] State machine: WAITING → SPEAKING → SILENCE_DETECTED → DONE
+- [x] Configurable thresholds via Settings
 
-#### 12.3 Wake Word Mode
-- [ ] After wake word, wait for speech start (don't record silence)
-- [ ] End recording when user stops speaking naturally
+#### 12.3 Wake Word Mode ✅
+- [x] Autonomous mode now uses `record_with_vad()`
+- [x] Waits for speech start (doesn't record silence)
+- [x] Ends recording when user stops speaking naturally
+- [x] Says "I didn't hear anything" if no speech detected
+
+#### 12.4 D-Bus API ✅
+- [x] `ListenVad()` - VAD-based listening method
 
 ### Files to Modify
 - `src/ear.rs` - Implement VAD logic
@@ -215,7 +221,7 @@ wyoming_auto_start = true
 | 9 | Manual Voice Training | 2-3 hours | ✅ Complete |
 | 10 | Pattern Import/Export | 1 hour | ✅ Complete |
 | 11 | Ignored Commands | 1-2 hours | ✅ Complete |
-| 12 | Improved VAD | 2-3 hours | 📋 Planned |
+| 12 | Improved VAD | 2-3 hours | ✅ Complete |
 | 13 | Wyoming Protocol | 4-6 hours | 📋 Future |
 
 ---

@@ -203,6 +203,7 @@ MIT License - See [LICENSE](LICENSE) for details.
 
 Contributions welcome! Please see:
 - [ROADMAP.md](ROADMAP.md) - Development phases
+- [examples/python_client.py](examples/python_client.py) - Ready-to-run Python client
 - [docs/API_REFERENCE.md](docs/API_REFERENCE.md) - API documentation
 - [HANDOFF.md](HANDOFF.md) - Current status and quick reference
 

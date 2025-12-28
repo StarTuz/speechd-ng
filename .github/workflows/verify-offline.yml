@@ -60,28 +60,35 @@ jobs:
         # Wrap everything in dbus-run-session so we have a bus
         dbus-run-session -- bash -c '
           # 1. Start Daemon with output captured
+          echo "Starting Daemon [Session Bus: $DBUS_SESSION_BUS_ADDRESS]..."
           ./target/release/speechserverdaemon > daemon.log 2>&1 &
           DAEMON_PID=$!
-          echo "Daemon started with PID: $DAEMON_PID"
           
           # 2. Wait for service to appear on bus (up to 30s)
           echo "Waiting for org.speech.Service to appear on bus..."
           for i in {1..30}; do
-            # Use busctl to look for the service name explicitly
-            if busctl --user list 2>/dev/null | grep -q "org.speech.Service"; then
+            # Use busctl to look for the service name on the SESSION bus (no --user)
+            if busctl list 2>/dev/null | grep -q "org.speech.Service"; then
                echo "Service is UP and owning name after $i seconds."
                break
             fi
+            
+            # Check if daemon is still alive
             if ! kill -0 $DAEMON_PID 2>/dev/null; then
                echo "::error::Daemon died during startup!"
                cat daemon.log
+               ps aux | grep speech
                exit 1
             fi
+            
             sleep 1
             if [ $i -eq 30 ]; then
                echo "::error::Timeout waiting for service name!"
+               echo "--- Daemon Logs ---"
                cat daemon.log
-               kill $DAEMON_PID
+               echo "--- Bus Status ---"
+               busctl list || echo "busctl failed"
+               ps aux
                exit 1
             fi
           done

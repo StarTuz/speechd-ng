@@ -2184,9 +2184,9 @@ dependencies = [
 
 [[package]]
 name = "ringbuf"
-version = "0.4.9"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e04ab381b403a7db29a4aa3571d2bbbf78b8227c56bb6bfd965979aa938d580"
+checksum = "fe47b720588c8702e34b5979cb3271a8b1842c7cb6f57408efa70c779363488c"
 dependencies = [
  "crossbeam-utils",
  "portable-atomic",
@@ -3732,9 +3732,9 @@ dependencies = [
 
 [[package]]
 name = "zmij"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6d6085d62852e35540689d1f97ad663e3971fc19cf5eceab364d62c646ea167"
+checksum = "f5858cd3a46fff31e77adea2935e357e3a2538d870741617bfb7c943e218fee6"
 
 [[package]]
 name = "zvariant"

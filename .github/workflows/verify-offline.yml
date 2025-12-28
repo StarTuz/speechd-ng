@@ -79,27 +79,19 @@ jobs:
             
             # Check if daemon is still alive
             if ! kill -0 $DAEMON_PID 2>/dev/null; then
-               echo "::error::Daemon died during startup!"
+               echo "::error::Daemon died early!"
                cat daemon.log
-               ps aux | grep speech
                exit 1
             fi
             
             sleep 1
-            if [ $i -eq 30 ]; then
-               echo "::error::Timeout waiting for service name!"
-               echo "--- Daemon Logs ---"
-               cat daemon.log
-               echo "--- Bus Status ---"
-               busctl list || echo "busctl failed"
-               ps aux
-               exit 1
-            fi
           done
 
           echo "Running Client Check..."
           python3 benchmarks/latency_test.py || {
             echo "::error::Client test failed!"
+            echo "--- Daemon Status ---"
+            busctl list | grep speech || echo "Service GONE from bus"
             echo "--- Daemon Logs ---"
             cat daemon.log
             exit 1

@@ -36,8 +36,18 @@ class Benchmarker:
     def run(self):
         print("=== SpeechD-NG Latency Benchmark ===\n")
 
+        # 0. Connection Check
+        print("Pinging service... ", end="", flush=True)
+        try:
+            res = self.iface.Ping()
+            print(f"[{res}]")
+        except Exception as e:
+            print(f"FAILED: {e}")
+            sys.exit(1)
+
         # 1. Ping / Config (Baseline)
-        self.measure("GetSttBackend (Ping)", lambda: self.iface.GetSttBackend(), iterations=20)
+        self.measure("Ping (Internal)", lambda: self.iface.Ping(), iterations=50)
+        self.measure("GetSttBackend (Config)", lambda: self.iface.GetSttBackend(), iterations=20)
 
         # 2. Speak (Fire and Forget)
         # This measures how fast the daemon creates the task, not audio duration.

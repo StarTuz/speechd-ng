@@ -1,0 +1,13 @@
+[Unit]
+Description=Speech Server Daemon Next-Gen
+Documentation=https://github.com/intent/speech
+
+[Service]
+Type=simple
+ExecStart=/home/startux/Code/speechserverdaemon/target/debug/speechserverdaemon
+Restart=on-failure
+BusName=org.speech.Service
+Environment=RUST_LOG=info
+
+[Install]
+WantedBy=default.target

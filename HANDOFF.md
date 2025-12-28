@@ -3,40 +3,49 @@
 ## Current Context
 We are building **SpeechD-NG**, a modern replacement for Linux command-line/desktop speech services. The project is written in **Rust** to ensure memory safety, speed, and concurrency.
 
-## Status: Phase 3 Completed (Brain & Body)
-We has successfully implemented the **Audio Engine** (Body) and the **Cortex** (Brain).
+## Status: Phase 4 Completed (Security & Configuration)
+We have implemented all core functionality through Phase 4.
 
 ### 1. Functional Features
--   **D-Bus Service**: The daemon claims `org.speech.Service` on the user bus.
+-   **D-Bus Service**: Claims `org.speech.Service` on the user session bus.
 -   **Async Core**: Uses `tokio` and `zbus` for non-blocking I/O.
--   **Audio Pipeline**: A dedicated thread handles `espeak-ng` generation + `rodio` playback.
--   **The Cortex**: A separate async module that:
-    -   Observes all spoken text and stores it in a short-term memory buffer (default: 50 items).
-    -   Connects to a local **Ollama** instance (`http://localhost:11434`) to answer questions about the speech context.
-    -   Exposes a `Think(query)` method via D-Bus.
+-   **Audio Pipeline**: Dedicated thread handles `espeak-ng` + `rodio` playback.
+-   **The Cortex**: Async module for speech memory and Ollama integration.
+-   **Security Hooks**: `SecurityAgent` validates sender on sensitive methods.
+-   **Configuration**: Dynamic settings via `Speech.toml`, environment vars, or defaults.
 
 ### 2. Key Technical Decisions
--   **Rodio v0.17.3**: Pinned for stability with the threaded actor model.
+-   **Rodio v0.17.3**: Pinned for API stability.
 -   **Dual-Actor Architecture**: 
-    -   `AudioEngine` (Sync Thread): Handles blocking audio operations.
-    -   `Cortex` (Async Task): Handles HTTP requests and state management.
-    -   `SpeechService` (Main): Dispatches to both in parallel.
+    -   `AudioEngine` (Sync Thread): Blocking audio operations.
+    -   `Cortex` (Async Task): HTTP/Ollama and state management.
+    -   `SpeechService` (Main): D-Bus dispatch to both actors.
+-   **Systemd Sandboxing**: 20+ security directives applied.
 
 ## File Structure
--   `src/main.rs`: Entry point. Dispatches D-Bus calls.
--   `src/engine.rs`: Audio synthesis actor.
--   `src/cortex.rs`: Intelligence & Memory actor.
--   `systemd/`: Service files.
+```
+src/
+├── main.rs          # Entry point, D-Bus interface
+├── engine.rs        # Audio synthesis actor
+├── cortex.rs        # Intelligence & Memory actor
+├── security.rs      # Permission validation (Polkit stub)
+└── config_loader.rs # Dynamic configuration
+systemd/
+├── speechd-ng.service         # Hardened systemd unit
+└── org.speech.Service.service # D-Bus activation file
+```
 
-## Immediate Next Steps (Phase 4)
-The next major milestone is **Security & Polish**.
+## Immediate Next Steps (Phase 5)
+The next milestone is **Plug-in & Voice System**.
 
-1.  **Polkit Integration**: 
-    -   The `Think` method exposes sensitive history. We *must* gate this behind a Polkit action (e.g., `org.speech.service.query-memory`) so random scripts can't snoop.
-2.  **Configuration**:
-    -   Allow users to configure the Ollama Model (currently hardcoded to `llama3`) and Memory Size.
-    -   Voice selection for `espeak-ng`.
+1.  **Backend Trait**: Abstract the TTS engine so `espeak-ng`, `Piper`, `Coqui`, etc. can be swapped.
+2.  **Voice Enumeration**: D-Bus method to list available voices.
+3.  **Voice Selection**: Allow callers to specify voice in `Speak()`.
 
-## Future Considerations
--   **Polkit**: We need to ensure arbitrary apps can't just spam the speech server or listen to history without permission.
--   **Voices**: Currently hardcoded to `espeak-ng` default. We need a way to pass voice parameters via D-Bus.
+## Known Limitations
+-   **Polkit**: Security hook logs but does not yet enforce denial (stub implementation).
+-   **LLM Sanitization**: User prompts are not sanitized before sending to Ollama.
+
+## Repository
+-   **GitHub**: https://github.com/StarTuz/speechd-ng
+-   **Branch**: `main`

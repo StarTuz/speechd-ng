@@ -22,12 +22,13 @@ modules:
   - name: speechd-ng
     buildsystem: simple
     build-commands:
-      - install -D speechserverdaemon /app/bin/speechserverdaemon
-      - install -D src/wakeword_bridge.py /app/lib/speechd-ng/wakeword_bridge.py
-      - install -D src/wyoming_bridge.py /app/lib/speechd-ng/wyoming_bridge.py
+      - install -Dm755 speechserverdaemon /app/bin/speechserverdaemon
+      - install -Dm755 wakeword_bridge.py /app/lib/speechd-ng/wakeword_bridge.py
+      - install -Dm755 wyoming_bridge.py /app/lib/speechd-ng/wyoming_bridge.py
     sources:
-      # In real usage, this would point to the release tarball / git repo
-      - type: dir
-        path: ../../target/release/
-      - type: dir
-        path: ../../src/
+      - type: file
+        path: ../../target/release/speechserverdaemon
+      - type: file
+        path: ../../src/wakeword_bridge.py
+      - type: file
+        path: ../../src/wyoming_bridge.py

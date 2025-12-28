@@ -1,0 +1,85 @@
+name: Verify Offline Resilience
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  offline-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasound2-dev libdbus-1-dev pkg-config libsystemd-dev dbus
+
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+
+    - name: Build
+      run: cargo build --release
+
+    - name: Setup Dummy Config (Broken Network)
+      run: |
+        mkdir -p ~/.config/speechd-ng
+        # Point Ollama to unreachable IP to simulate timeout/offline
+        # Enable AI to force the code path to try connecting
+        cat <<EOF > ~/.config/speechd-ng/Speech.toml
+        ollama_url = "http://192.0.2.1:12345" 
+        ollama_model = "void"
+        enable_ai = true
+        piper_model = "en_US-lessac-medium"
+        tts_backend = "espeak" 
+        EOF
+
+    - name: Start Daemon (Background)
+      run: |
+        # Run dbus-run-session to create a session bus
+        # We start the daemon in background
+        # We need to export DBUS_SESSION_BUS_ADDRESS for the client
+        echo "Starting Daemon..."
+    
+    - name: Run Resilience Test
+      run: |
+        # Wrap everything in dbus-run-session so we have a bus
+        dbus-run-session -- bash -c '
+          # 1. Start Daemon
+          ./target/release/speechserverdaemon &
+          DAEMON_PID=$!
+          echo "Daemon PID: $DAEMON_PID"
+          sleep 5 # Give it time to start
+
+          # 2. Run Benchmark/Check
+          # It should connect (Ping), Speak (OK), and Think (Fail gracefully)
+          echo "Running Client Check..."
+          python3 benchmarks/latency_test.py
+          CLIENT_EXIT=$?
+
+          if [ $CLIENT_EXIT -ne 0 ]; then
+            echo "Client failed!"
+            kill $DAEMON_PID
+            exit 1
+          fi
+
+          # 3. Verify Daemon is still alive
+          if ! kill -0 $DAEMON_PID; then
+            echo "Daemon crashed!"
+            exit 1
+          fi
+
+          echo "Offline resilience verified."
+          kill $DAEMON_PID
+        '

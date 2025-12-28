@@ -103,5 +103,5 @@ This document outlines the strategic phases for SpeechD-NG development.
 **Goal**: Production readiness and distribution.
 -   [ ] **Packaging**: Create `.deb`, `.rpm`, and `Flatpak` manifests.
 -   [x] **Safety**: Implement `RollbackLastCorrection` to undo bad learning. (✅ Implemented)
--   [ ] **Benchmarking**: Create latency/resource usage test suite.
--   [ ] **CI Hardening**: Add offline-mode verification tests.
+-   [x] **Benchmarking**: Create latency/resource usage test suite. (✅ Implemented)
+-   [x] **CI Hardening**: Add offline-mode verification tests. (✅ Implemented)

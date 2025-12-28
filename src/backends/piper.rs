@@ -163,35 +163,32 @@ impl SpeechBackend for PiperBackend {
             .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("Piper model not found locally for voice: {}. Please download it first.", voice_id)))?;
 
         let mut child = Command::new(&self.binary_path)
-            .arg("--model")
-            .arg(onnx_path)
+            .arg("-q")              // Quiet mode - prevent logs from mixing with audio
+            .arg("-m")
+            .arg(&onnx_path)
+            .arg("--output_file")
+            .arg("-")               // Output WAV to stdout
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()?;
 
-        {
+        // Write text to stdin and close it
+        if let Some(mut stdin) = child.stdin.take() {
             use std::io::Write;
-            let mut stdin = child.stdin.take().expect("Failed to open stdin");
             stdin.write_all(text.as_bytes())?;
             stdin.write_all(b"\n")?;
+            // stdin is dropped here, closing the pipe
         }
 
-        match child.wait_timeout(Duration::from_secs(60))? {
-            Some(status) => {
-                let output = child.wait_with_output()?;
-                if status.success() {
-                    Ok(output.stdout)
-                } else {
-                    let err = String::from_utf8_lossy(&output.stderr);
-                    Err(Error::new(ErrorKind::Other, format!("Piper error: {}", err)))
-                }
-            },
-            None => {
-                let _ = child.kill();
-                let _ = child.wait();
-                Err(Error::new(ErrorKind::TimedOut, "Piper timed out"))
-            }
+        // Now wait for completion and read output
+        let output = child.wait_with_output()?;
+        
+        if output.status.success() {
+            Ok(output.stdout)
+        } else {
+            let err = String::from_utf8_lossy(&output.stderr);
+            Err(Error::new(ErrorKind::Other, format!("Piper error: {}", err)))
         }
     }
 }

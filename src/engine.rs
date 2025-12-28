@@ -80,14 +80,17 @@ impl AudioEngine {
 
                             match backend.synthesize(&text, voice_id) {
                                 Ok(audio_data) => {
+                                    println!("Audio Thread: Received {} bytes of audio data", audio_data.len());
                                     let cursor = Cursor::new(audio_data);
                                     match Sink::try_new(&stream_handle) {
                                         Ok(sink) => {
                                             match Decoder::new(cursor) {
                                                 Ok(source) => {
                                                     use rodio::Source;
+                                                    println!("Audio Thread: Playing audio...");
                                                     sink.append(source.convert_samples::<f32>());
                                                     sink.sleep_until_end();
+                                                    println!("Audio Thread: Playback complete");
                                                 }
                                                 Err(e) => eprintln!("Failed to decode: {}", e),
                                             }

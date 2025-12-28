@@ -52,7 +52,7 @@ All settings are in `~/.config/speechd-ng/Speech.toml`:
 ## Known Limitations
 -   **Microphone Exclusivity**: If another app uses the mic exclusively, the wake word listener might fail (PulseAudio/Pipewire handles this usually).
 -   **Vosk Model Path**: The bridge looks for models in `~/.cache/vosk/`.
--   **Audio Playback Issue**: TTS audio playback may fail with "Failed to decode: end of stream". Wake word detection, command recording, and AI text generation work, but final audio output needs debugging. Likely a WAV format mismatch between Piper output and `rodio`.
+-   **Piper Binary Conflict**: If `/usr/bin/piper` exists (a different GTK app), you must set `piper_binary` to the correct Piper TTS path in your config.
 
 ## Repository
 -   **GitHub**: https://github.com/StarTuz/speechd-ng

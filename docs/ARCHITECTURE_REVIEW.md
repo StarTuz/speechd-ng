@@ -51,8 +51,8 @@
 - **SSIP Shim**: Implemented to emulate `speech-dispatcher` for ORCA/Firefox compatibility. (Requires further validation).
 
 ## 7. Action Items (Future Roadmap)
-- [ ] Create `.deb` / `.rpm` packaging scripts.
+- [x] Create `.deb` / `.rpm` packaging scripts. (✅ Completed)
 - [x] Add `enable_ai = false` config option. (✅ Completed)
 - [x] Implement `Rollback` and specialized "Safety" UI. (✅ Completed)
-- [ ] Benchmark suite for latency measurements.
-- [ ] **CI**: Add explicit offline-mode test (network disabled, Ollama unreachable) to verification pipeline.
+- [x] Benchmark suite for latency measurements. (✅ Completed)
+- [x] **CI**: Add explicit offline-mode test (network disabled, Ollama unreachable) to verification pipeline. (✅ Completed)

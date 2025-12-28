@@ -7,6 +7,7 @@ use lazy_static::lazy_static;
 pub struct Settings {
     pub ollama_url: String,
     pub ollama_model: String,
+    pub enable_ai: bool,
     pub piper_model: String,
     pub piper_binary: String,
     pub tts_backend: String,
@@ -32,6 +33,7 @@ impl Default for Settings {
         Self {
             ollama_url: "http://localhost:11434".to_string(),
             ollama_model: "llama3".to_string(),
+            enable_ai: true,
             piper_model: "en_US-lessac-medium".to_string(),
             piper_binary: "piper".to_string(),
             tts_backend: "espeak".to_string(),

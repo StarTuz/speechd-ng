@@ -70,6 +70,16 @@ impl Cortex {
                         }
                     }
                     CortexMessage::Query { prompt, asr_heard, response_tx } => {
+                        // Check if AI is enabled
+                        let ai_enabled = crate::config_loader::SETTINGS.read()
+                            .map(|s| s.enable_ai)
+                            .unwrap_or(true);
+
+                        if !ai_enabled {
+                            let _ = response_tx.send("AI is disabled.".to_string()).await;
+                            continue;
+                        }
+
                         println!("Cortex thinking on: {}", prompt);
                         
                         let context = if let Ok(mem) = memory.lock() {

@@ -37,7 +37,10 @@ impl SpeechService {
                 engine.speak(&text, None);
             }
         }
-        self.cortex.observe(text).await;
+        let ai_enabled = config_loader::SETTINGS.read().map(|s| s.enable_ai).unwrap_or(true);
+        if ai_enabled {
+            self.cortex.observe(text).await;
+        }
     }
 
     async fn speak_voice(&self, #[zbus(header)] _header: Header<'_>, text: String, voice: String) {
@@ -52,7 +55,10 @@ impl SpeechService {
                  engine.speak(&text, Some(voice));
              }
          }
-         self.cortex.observe(text).await;
+         let ai_enabled = config_loader::SETTINGS.read().map(|s| s.enable_ai).unwrap_or(true);
+         if ai_enabled {
+             self.cortex.observe(text).await;
+         }
     }
 
     async fn list_voices(&self) -> Vec<(String, String)> {
@@ -110,6 +116,14 @@ impl SpeechService {
         if let Err(e) = SecurityAgent::check_permission(&header, "org.speech.service.think").await {
             eprintln!("Access Denied: {}", e);
             return "Access Denied".to_string();
+        }
+
+        let ai_enabled = config_loader::SETTINGS.read()
+            .map(|s| s.enable_ai)
+            .unwrap_or(true);
+
+        if !ai_enabled {
+            return "AI Disabled".to_string();
         }
 
         println!("Received thought query: {}", query);

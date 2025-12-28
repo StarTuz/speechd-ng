@@ -65,6 +65,7 @@ Create `~/.config/speechd-ng/Speech.toml`:
 # LLM Settings
 ollama_url = "http://localhost:11434"
 ollama_model = "llama3"
+enable_ai = true                    # Set to false to disable LLM features (saves RAM)
 
 # TTS Settings
 piper_model = "en_US-lessac-medium"

@@ -187,6 +187,78 @@ impl Fingerprint {
             .collect()
     }
 
+    /// Export fingerprint to a file
+    /// Returns true if successful
+    pub fn export_to_path(&self, path: &str) -> bool {
+        let data = self.data.lock().unwrap();
+        match serde_json::to_string_pretty(&*data) {
+            Ok(content) => {
+                match fs::write(path, content) {
+                    Ok(_) => {
+                        println!("Fingerprint: Exported {} patterns to {}", data.patterns.len(), path);
+                        true
+                    }
+                    Err(e) => {
+                        eprintln!("Fingerprint: Export failed - {}", e);
+                        false
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("Fingerprint: Serialization failed - {}", e);
+                false
+            }
+        }
+    }
+
+    /// Import fingerprint from a file
+    /// If merge=true, merges with existing patterns (existing win on conflict)
+    /// If merge=false, replaces current fingerprint entirely
+    /// Returns count of patterns after import
+    pub fn import_from_path(&self, path: &str, merge: bool) -> u32 {
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Fingerprint: Import failed to read file - {}", e);
+                return 0;
+            }
+        };
+
+        let imported: FingerprintData = match serde_json::from_str(&content) {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("Fingerprint: Import failed to parse JSON - {}", e);
+                return 0;
+            }
+        };
+
+        let mut data = self.data.lock().unwrap();
+        
+        if merge {
+            // Merge: imported patterns fill in gaps, don't overwrite existing
+            let mut added = 0u32;
+            for (heard, pattern) in imported.patterns {
+                if !data.patterns.contains_key(&heard) {
+                    data.patterns.insert(heard, pattern);
+                    added += 1;
+                }
+            }
+            println!("Fingerprint: Merged {} new patterns from {}", added, path);
+        } else {
+            // Replace: overwrite everything
+            *data = imported;
+            println!("Fingerprint: Replaced with {} patterns from {}", data.patterns.len(), path);
+        }
+
+        self.save(&data);
+        data.patterns.len() as u32
+    }
+
+    /// Get the path to the fingerprint file
+    pub fn get_path(&self) -> String {
+        self.path.to_string_lossy().to_string()
+    }
+
     fn save(&self, data: &FingerprintData) {
         if let Ok(content) = serde_json::to_string_pretty(data) {
             fs::write(&self.path, content).ok();

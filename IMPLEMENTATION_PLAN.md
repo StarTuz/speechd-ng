@@ -4,8 +4,8 @@ This document outlines the next phases of development for SpeechD-NG, focused on
 
 ## Current Status
 
-**Phases 1-9**: ✅ Complete
-- Core D-Bus service, TTS engines, STT, LLM integration, wake word, passive learning, **manual training**
+**Phases 1-10**: ✅ Complete
+- Core D-Bus service, TTS engines, STT, LLM integration, wake word, passive learning, **manual training**, **import/export**
 
 ---
 
@@ -58,7 +58,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Add
 
 ---
 
-## Phase 10: Pattern Import/Export
+## Phase 10: Pattern Import/Export ✅ COMPLETE
 
 **Goal**: Share learned voice patterns between systems or back up learned data.
 
@@ -69,20 +69,24 @@ Fingerprint data is already stored as JSON. Expose D-Bus methods to export/impor
 
 ### Implementation Steps
 
-#### 10.1 Export Method
-- [ ] `ExportFingerprint(path: String) -> bool`
-  - Copies `~/.local/share/speechd-ng/fingerprint.json` to specified path
+#### 10.1 Export Method ✅
+- [x] `ExportFingerprint(path: String) -> bool`
+  - Exports fingerprint data to specified path
   - Returns success status
 
-#### 10.2 Import Method
-- [ ] `ImportFingerprint(path: String, merge: bool) -> u32`
+#### 10.2 Import Method ✅
+- [x] `ImportFingerprint(path: String, merge: bool) -> u32`
   - If `merge=true`: Adds patterns from file to existing (doesn't overwrite)
   - If `merge=false`: Replaces current fingerprint entirely
-  - Returns count of patterns imported
+  - Returns count of patterns after import
 
 #### 10.3 Pattern Stats ✅ (Already implemented in Phase 9)
 - [x] `GetFingerprintStats() -> (manual_count, passive_count, command_count)`
   - Quick overview of fingerprint status
+
+#### 10.4 Additional Helper ✅
+- [x] `GetFingerprintPath() -> String`
+  - Returns path to fingerprint data file
 
 ### Files to Modify
 - `src/fingerprint.rs` - Add export/import/stats methods
@@ -206,7 +210,7 @@ wyoming_auto_start = true
 | Phase | Feature | Est. Time | Status |
 |-------|---------|-----------|--------|
 | 9 | Manual Voice Training | 2-3 hours | ✅ Complete |
-| 10 | Pattern Import/Export | 1 hour | 📋 Planned |
+| 10 | Pattern Import/Export | 1 hour | ✅ Complete |
 | 11 | Ignored Commands | 1-2 hours | 📋 Planned |
 | 12 | Improved VAD | 2-3 hours | 📋 Planned |
 | 13 | Wyoming Protocol | 4-6 hours | 📋 Future |

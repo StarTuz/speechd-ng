@@ -18,8 +18,10 @@ Environment=RUST_LOG=info
 ProtectSystem=strict
 ProtectHome=read-only
 PrivateTmp=true
-# Allow writing to Piper models directory
+# Allow writing to Piper models directory and SpeechD-NG data
 ReadWritePaths=%h/.local/share/piper/models
+ReadWritePaths=%h/.local/share/speechd-ng
+ReadWritePaths=%h/Documents
 
 # Prevent privilege escalation
 NoNewPrivileges=true

@@ -209,6 +209,29 @@ impl SpeechService {
             })
             .collect()
     }
+
+    // ========== Phase 10: Pattern Import/Export ==========
+
+    /// Export fingerprint to a file
+    /// Returns true if successful
+    async fn export_fingerprint(&self, path: String) -> bool {
+        println!("Exporting fingerprint to: {}", path);
+        self.fingerprint.export_to_path(&path)
+    }
+
+    /// Import fingerprint from a file
+    /// If merge=true, adds new patterns without overwriting existing
+    /// If merge=false, replaces current fingerprint entirely
+    /// Returns total pattern count after import
+    async fn import_fingerprint(&self, path: String, merge: bool) -> u32 {
+        println!("Importing fingerprint from: {} (merge={})", path, merge);
+        self.fingerprint.import_from_path(&path, merge)
+    }
+
+    /// Get the path to the fingerprint data file
+    async fn get_fingerprint_path(&self) -> String {
+        self.fingerprint.get_path()
+    }
 }
 
 #[tokio::main]

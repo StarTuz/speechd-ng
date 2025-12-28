@@ -71,11 +71,11 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **GetFingerprintStats D-Bus Method**: Quick overview of learning status.
 -   [x] **Training Feedback**: Speak confirmation of what was learned.
 
-## Phase 10: Pattern Import/Export (📋 Planned)
+## Phase 10: Pattern Import/Export (✅ Completed)
 **Goal**: Share and backup voice patterns.
--   [ ] **ExportFingerprint**: Save learned patterns to file.
--   [ ] **ImportFingerprint**: Load/merge patterns from file.
--   [ ] **GetFingerprintStats**: Quick overview of learning status.
+-   [x] **ExportFingerprint**: Save learned patterns to file.
+-   [x] **ImportFingerprint**: Load/merge patterns from file.
+-   [x] **GetFingerprintPath**: Get path to fingerprint data file.
 
 ## Phase 11: Ignored Commands Tracking (📋 Planned)
 **Goal**: Track failed commands for later correction.

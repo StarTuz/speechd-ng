@@ -5,6 +5,7 @@ mod security;
 mod backends;
 mod ear;
 mod ssip;
+mod fingerprint;
 use engine::AudioEngine;
 use cortex::Cortex;
 use ear::Ear;

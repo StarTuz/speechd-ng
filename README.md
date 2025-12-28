@@ -9,6 +9,7 @@
 4.  **AI-Ready**: Built to integrate with local LLMs (like Ollama) for passive/active learning.
 5.  **Neural First**: First-class support for high-quality Piper neural voices with automated model downloading.
 6.  **Autonomous**: Integrated wake word detection for hands-free interaction.
+7.  **Self-Improving**: Passive and active voice learning to correct transcription errors over time.
 
 ## 🏗 Architecture
 
@@ -16,6 +17,7 @@
 2.  **The Audio Engine**: Multi-backend mixer supporting `eSpeak-ng` and `Piper`.
 3.  **The Ear**: Native audio capture with offline STT (Vosk/Whisper) and Wake Word detection.
 4.  **The Cortex**: Async Ollama connector for context-aware "thinking" and summaries.
+5.  **The Fingerprint**: Local learning engine that tracks voice patterns and corrects STT errors.
 
 ## 🛠 Building & Installation
 
@@ -42,6 +44,20 @@ cargo build --release
     systemctl --user daemon-reload
     systemctl --user enable --now speechd-ng
     ```
+
+### Configuration
+Create `~/.config/speechd-ng/Speech.toml` with any of these options:
+```toml
+ollama_url = "http://localhost:11434"   # LLM endpoint
+ollama_model = "llama3"                 # LLM model name
+piper_model = "en_US-lessac-medium"     # Default Piper voice
+piper_binary = "piper"                  # Path to piper binary (or just name for PATH lookup)
+tts_backend = "piper"                   # Default backend: "piper" or "espeak"
+memory_size = 50                        # Context memory size
+enable_audio = true                     # Audio output toggle
+wake_word = "startuz"                   # Wake word phrase
+enable_wake_word = false                # Enable hands-free mode
+```
 
 ## 📡 API Usage (D-Bus)
 
@@ -70,3 +86,4 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Dow
 -   **Phase 5: Premium Voices** (✅ Piper + Zero-Config Downloader)
 -   **Phase 6: Accessibility** (✅ STT + SSIP/Orca Shim)
 -   **Phase 7: Autonomous** (✅ Wake Word + Command Loop)
+-   **Phase 8: Voice Learning** (✅ Personalized Fingerprinting)

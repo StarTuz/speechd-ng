@@ -10,7 +10,7 @@ use std::sync::mpsc::{channel, Sender as MpscSender};
 use tokio::sync::oneshot;
 
 enum AudioMessage {
-    Speak(String, Option<String>),
+    Speak(String, Option<String>, Option<oneshot::Sender<()>>),
     ListVoices(oneshot::Sender<Vec<Voice>>),
     ListDownloadableVoices(oneshot::Sender<Vec<Voice>>),
     DownloadVoice(String, oneshot::Sender<std::io::Result<()>>),
@@ -36,7 +36,7 @@ impl AudioEngine {
             
             while let Ok(msg) = rx.recv() {
                 match msg {
-                    AudioMessage::Speak(text, voice) => {
+                    AudioMessage::Speak(text, voice, complete_tx) => {
                         let (piper_model, default_backend) = {
                             let s = crate::config_loader::SETTINGS.read().unwrap();
                             (s.piper_model.clone(), s.tts_backend.clone())
@@ -59,17 +59,26 @@ impl AudioEngine {
 
                         // 2. Locate the backend
                         if let Some(backend) = backends.get(target_backend_id) {
-                            // For Piper specifically, if no voice is specified in the string (after prefix), 
-                            // we use the configured default piper_model.
-                            let voice_to_use = if target_backend_id == "piper" && actual_voice.is_none() {
+                            // Determine the base voice ID, stripping any prefixes if present in config or parameters
+                            let raw_voice = if target_backend_id == "piper" && actual_voice.is_none() {
                                 Some(piper_model.as_str())
                             } else {
                                 actual_voice
                             };
 
-                            println!("Audio Thread: Routing '{}' to {} (voice: {:?})", text, target_backend_id, voice_to_use);
+                            let voice_id = raw_voice.map(|v| {
+                                if v.starts_with("piper:") {
+                                    &v[6..]
+                                } else if v.starts_with("espeak:") {
+                                    &v[7..]
+                                } else {
+                                    v
+                                }
+                            });
 
-                            match backend.synthesize(&text, voice_to_use) {
+                            println!("Audio Thread: Routing '{}' to {} (voice: {:?})", text, target_backend_id, voice_id);
+
+                            match backend.synthesize(&text, voice_id) {
                                 Ok(audio_data) => {
                                     let cursor = Cursor::new(audio_data);
                                     match Sink::try_new(&stream_handle) {
@@ -78,7 +87,7 @@ impl AudioEngine {
                                                 Ok(source) => {
                                                     use rodio::Source;
                                                     sink.append(source.convert_samples::<f32>());
-                                                    sink.detach(); 
+                                                    sink.sleep_until_end();
                                                 }
                                                 Err(e) => eprintln!("Failed to decode: {}", e),
                                             }
@@ -90,6 +99,9 @@ impl AudioEngine {
                             }
                         } else {
                             eprintln!("Error: Unknown backend '{}'", target_backend_id);
+                        }
+                        if let Some(tx) = complete_tx {
+                            let _ = tx.send(());
                         }
                     },
                     AudioMessage::ListVoices(resp_tx) => {
@@ -140,7 +152,13 @@ impl AudioEngine {
     }
 
     pub fn speak(&self, text: &str, voice: Option<String>) {
-        let _ = self.tx.send(AudioMessage::Speak(text.to_string(), voice));
+        let _ = self.tx.send(AudioMessage::Speak(text.to_string(), voice, None));
+    }
+
+    pub async fn speak_blocking(&self, text: &str, voice: Option<String>) {
+        let (tx, rx) = oneshot::channel();
+        let _ = self.tx.send(AudioMessage::Speak(text.to_string(), voice, Some(tx)));
+        let _ = rx.await;
     }
 
     pub async fn list_voices(&self) -> Vec<Voice> {

@@ -49,3 +49,10 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **Wake Word Detection**: Low-power standby observing for "StarTuz" via Vosk.
 -   [x] **Voice Commands**: Trigger actions via speech (e.g., "Summarize the last 10 minutes").
 -   [x] **Command Loop**: Seamless transition from standby to active listening and back.
+
+## Phase 8: Personalized Voice Learning (✅ Completed)
+**Goal**: Self-Improving Accuracy.
+-   [x] **Fingerprint Module**: Local storage for voice patterns and command frequencies.
+-   [x] **Passive Learning Loop**: Automatically learn from LLM-corrected transcription errors.
+-   [x] **Contextual Prompt Injection**: Dynamically inject learned patterns into LLM system prompts for better interpretation.
+-   [x] **Local Privacy**: All learning data remains private and local to the user's home directory.

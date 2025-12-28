@@ -53,33 +53,95 @@ impl Ear {
             println!("Ear: Autonomous mode active. Watching for '{}'...", wake_word);
             
             loop {
+                println!("Ear: Loop iteration started...");
+                let host = cpal::default_host();
+                println!("Ear: Host acquired.");
+                
+                let device = {
+                    let mut selected = None;
+                    if let Ok(devices) = host.input_devices() {
+                        for d in devices {
+                            let name = d.name().unwrap_or_else(|_| "Unknown".into());
+                            println!("Ear: Found input device: {}", name);
+                            
+                            // Skip clearly non-mic or dummy devices
+                            if name == "null" || name == "default" || name.contains("Monitor") || name == "jack" {
+                                continue;
+                            }
+
+                            // Prioritize devices that look like real physical mics
+                            if name.contains("CARD=") || name.contains("Headset") || name.contains("Built-in") {
+                                selected = Some(d);
+                                break; // Take the first good physical device
+                            }
+                            
+                            if selected.is_none() {
+                                selected = Some(d);
+                            }
+                        }
+                    }
+                    selected.or_else(|| host.default_input_device()).expect("No input device")
+                };
+
+                println!("Ear: Device acquired: {:?}, Backend: {:?}", device.name().ok(), host.id());
+                let config = device.default_input_config().expect("Failed to get config");
+                println!("Ear: Config acquired.");
+                
+                let sample_rate: u32 = config.sample_rate().into();
+                let sample_rate_str = sample_rate.to_string();
+                let channels = config.channels();
+                println!("Ear: Microdevice: {}, Sample Rate: {}, Channels: {}", 
+                    device.name().unwrap_or_else(|_| "Unknown".into()),
+                    sample_rate,
+                    channels
+                );
+
+                println!("Ear: Starting bridge at path: {:?}", bridge_path);
+
                 let mut child = Command::new("python3")
                     .arg(&bridge_path)
                     .arg(&model_path)
                     .arg(&wake_word)
+                    .arg(&sample_rate_str)
                     .stdin(Stdio::piped())
                     .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
                     .spawn()
                     .expect("Failed to start wakeword bridge");
 
                 let mut stdin = child.stdin.take().expect("Failed to open bridge stdin");
                 let stdout = child.stdout.take().expect("Failed to open bridge stdout");
+                let stderr = child.stderr.take().expect("Failed to open bridge stderr");
                 let mut bridge_reader = BufReader::new(stdout);
 
-                let host = cpal::default_host();
-                let device = host.default_input_device().expect("No input device");
-                let config = device.default_input_config().expect("Failed to get config");
+                // Spawn a thread to forward stderr to our logs
+                thread::spawn(move || {
+                    let reader = BufReader::new(stderr);
+                    for line in reader.lines() {
+                        if let Ok(l) = line {
+                            println!("Ear [Bridge Error]: {}", l);
+                        }
+                    }
+                });
                 
                 // Use a shared atomic to stop the stream
                 let running = Arc::new(std::sync::atomic::AtomicBool::new(true));
                 let running_clone = running.clone();
 
+                let mut last_pulse = std::time::Instant::now();
+
                 let stream = device.build_input_stream(
                     &config.clone().into(),
                     move |data: &[f32], _: &_| {
                         if running_clone.load(std::sync::atomic::Ordering::SeqCst) {
-                            let mut pcm = Vec::with_capacity(data.len() * 2);
-                            for &sample in data {
+                            if last_pulse.elapsed() > Duration::from_secs(5) {
+                                println!("Ear: Audio Flow Pulse (Callback active)");
+                                last_pulse = std::time::Instant::now();
+                            }
+                            let mut pcm = Vec::with_capacity(data.len() / (channels as usize) * 2);
+                            // Only take the first channel if it's multi-channel
+                            for chunk in data.chunks_exact(channels as usize) {
+                                let sample = chunk[0];
                                 let s = (sample.clamp(-1.0, 1.0) * i16::MAX as f32) as i16;
                                 pcm.extend_from_slice(&s.to_le_bytes());
                             }
@@ -87,7 +149,7 @@ impl Ear {
                             let _ = stdin.flush();
                         }
                     },
-                    |err| eprintln!("Wake word stream error: {}", err),
+                    |err| println!("Wake word stream error: {}", err),
                     None
                 ).expect("Failed to build background stream");
 
@@ -102,8 +164,11 @@ impl Ear {
                         let _ = child.kill();
 
                         // 1. Notify
+                        // 1. Notify
                         if let Ok(e) = engine.lock() {
-                            e.speak("Listening.", Some("espeak:en-us".to_string()));
+                            tokio::runtime::Runtime::new().unwrap().block_on(async {
+                                e.speak_blocking("Listening.", None).await;
+                            });
                         }
 
                         // 2. Capture Command
@@ -114,7 +179,7 @@ impl Ear {
                         if !command.trim().is_empty() {
                             // 3. Think & Respond
                             let response = tokio::runtime::Runtime::new().unwrap().block_on(async {
-                                cortex.query(command).await
+                                cortex.query_with_asr(command.clone(), command).await
                             });
                             
                             if let Ok(e) = engine.lock() {
@@ -134,7 +199,27 @@ impl Ear {
         let path = "/tmp/recorded_speech.wav";
         
         let host = cpal::default_host();
-        let device = host.default_input_device().expect("No input device");
+        let device = {
+            let mut selected = None;
+            if let Ok(devices) = host.input_devices() {
+                for d in devices {
+                    let name = d.name().unwrap_or_else(|_| "Unknown".into());
+                    if name == "null" || name == "default" || name.contains("Monitor") || name == "jack" {
+                        continue;
+                    }
+                    if name.contains("CARD=") || name.contains("Headset") || name.contains("Built-in") {
+                        selected = Some(d);
+                        break;
+                    }
+                    if selected.is_none() {
+                        selected = Some(d);
+                    }
+                }
+            }
+            selected.or_else(|| host.default_input_device()).expect("No input device")
+        };
+
+        println!("Ear: Recording command from device: {:?}", device.name().ok());
         let config = device.default_input_config().expect("No config");
         let sample_rate: u32 = config.sample_rate().into();
 
@@ -148,9 +233,14 @@ impl Ear {
                     b.extend_from_slice(data);
                 }
             },
-            |err| eprintln!("stream error: {}", err),
+            move |err| {
+                eprintln!("Ear: Recording stream error: {}", err);
+            },
             None
-        ).expect("Failed to build stream");
+        ).map_err(|e| {
+            eprintln!("Ear: Failed to build recording stream: {}", e);
+            e
+        }).expect("Failed to build stream");
 
         stream.play().unwrap();
         thread::sleep(Duration::from_secs(seconds));

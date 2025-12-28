@@ -17,8 +17,12 @@ impl PiperBackend {
             .unwrap_or_else(|| PathBuf::from("/tmp"))
             .join(".local/share/piper/models");
         
+        let binary_path = crate::config_loader::SETTINGS.read()
+            .map(|s| s.piper_binary.clone())
+            .unwrap_or_else(|_| "piper".to_string());
+        
         Self {
-            binary_path: "piper".to_string(),
+            binary_path,
             models_dir,
         }
     }
@@ -161,7 +165,6 @@ impl SpeechBackend for PiperBackend {
         let mut child = Command::new(&self.binary_path)
             .arg("--model")
             .arg(onnx_path)
-            .arg("--output_raw")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -174,7 +177,7 @@ impl SpeechBackend for PiperBackend {
             stdin.write_all(b"\n")?;
         }
 
-        match child.wait_timeout(Duration::from_secs(10))? {
+        match child.wait_timeout(Duration::from_secs(60))? {
             Some(status) => {
                 let output = child.wait_with_output()?;
                 if status.success() {

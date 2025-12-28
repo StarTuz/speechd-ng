@@ -24,6 +24,13 @@ SpeechD-NG is designed to run as a central system service, potentially processin
 *   **Threat**: A malicious actor sends crafted text to manipulate the LLM's behavior.
 *   **Mitigation**: User input is sanitized before being sent to Ollama (implemented). System prompts are separated from user content.
 
+### 5. Voice Learning Data Privacy
+*   **Threat**: Voice fingerprints or learned patterns could leak sensitive pronunciation or command habits.
+*   **Mitigation**: 
+    *   **Local Storage**: All learning data is stored locally in `~/.local/share/speechd-ng/fingerprint.json`.
+    *   **No Cloud Sync**: Learned patterns are never uploaded to any external service (except when passed as part of an LLM prompt to a local Ollama instance).
+    *   **Anonymization**: History is limited to the last 100 entries.
+
 ## Hardening Configuration
 
 ### Systemd Sandboxing (Implemented)

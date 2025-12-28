@@ -1,6 +1,7 @@
 ollama_url = "http://localhost:11434"
 ollama_model = "llama3"
-piper_model = "en_US-lessac-medium"
+piper_model = "piper:en_GB-jenny_dioco-medium"
+piper_binary = "/home/startux/.local/share/tuxtalks/piper/piper"
 tts_backend = "piper"
 memory_size = 50
 enable_audio = true

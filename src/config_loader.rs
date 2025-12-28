@@ -99,3 +99,13 @@ impl Settings {
         builder.build()?.try_deserialize()
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_config_load() {
+        let settings = Settings::new().expect("Failed to load settings");
+        assert!(settings.memory_size > 0);
+    }
+}

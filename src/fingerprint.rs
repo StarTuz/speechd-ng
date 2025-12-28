@@ -21,12 +21,21 @@ pub struct IgnoredCommand {
     pub context: String,  // Optional context about where it failed
 }
 
+#[derive(Clone, Debug)]
+pub struct UndoAction {
+    pub heard: String,
+    pub previous_pattern: Option<Pattern>,
+}
+
 #[derive(Serialize, Deserialize, Default)]
 pub struct FingerprintData {
     pub patterns: HashMap<String, Pattern>,
     pub command_history: Vec<String>,
     #[serde(default)]
     pub ignored_commands: Vec<IgnoredCommand>,
+    
+    #[serde(skip)]
+    pub undo_stack: Vec<UndoAction>,
 }
 
 #[derive(Clone)]
@@ -81,7 +90,14 @@ impl Fingerprint {
             .unwrap_or(0.1);
 
         let mut data = self.data.lock().unwrap();
-        let entry = data.patterns.entry(heard.to_lowercase()).or_insert(Pattern {
+        
+        // Undo State
+        let heard_lower = heard.to_lowercase();
+        let prev = data.patterns.get(&heard_lower).cloned();
+        data.undo_stack.push(UndoAction { heard: heard_lower.clone(), previous_pattern: prev });
+        if data.undo_stack.len() > 50 { data.undo_stack.remove(0); }
+
+        let entry = data.patterns.entry(heard_lower).or_insert(Pattern {
             correction: meant.to_lowercase(),
             count: 0,
             confidence: 0.0,
@@ -124,6 +140,11 @@ impl Fingerprint {
         let heard_lower = heard.to_lowercase();
         let meant_lower = meant.to_lowercase();
         
+        // Undo State
+        let prev = data.patterns.get(&heard_lower).cloned();
+        data.undo_stack.push(UndoAction { heard: heard_lower.clone(), previous_pattern: prev });
+        if data.undo_stack.len() > 50 { data.undo_stack.remove(0); }
+
         // Manual corrections start with high confidence (0.7) and boost quickly
         let entry = data.patterns.entry(heard_lower.clone()).or_insert(Pattern {
             correction: meant_lower.clone(),
@@ -152,6 +173,31 @@ impl Fingerprint {
         println!("Fingerprint: Learned '{}' → '{}' (manual, confidence: {:.0}%)", 
             heard, correction, confidence * 100.0);
         true
+    }
+
+    /// Rollback the last correction (manual or passive) via undo stack
+    pub fn rollback_last_correction(&self) -> bool {
+        let mut data = self.data.lock().unwrap();
+        if let Some(undo) = data.undo_stack.pop() {
+            if let Some(prev) = undo.previous_pattern {
+                println!("Fingerprint: Rolling back '{}' to previous state", undo.heard);
+                data.patterns.insert(undo.heard, prev);
+            } else {
+                 println!("Fingerprint: Rolling back '{}' to [deleted]", undo.heard);
+                 data.patterns.remove(&undo.heard);
+            }
+            // Save after rollback
+            // (We have to release lock to call self.save if self.save locks? 
+            // Check self.save: it takes reference to data, doesn't lock.
+            // But wait, self.save takes &FingerprintData. 
+            // data is MutexGuard. &*data works.
+            if let Ok(content) = serde_json::to_string_pretty(&*data) {
+                fs::write(&self.path, content).ok();
+            }
+            true
+        } else {
+            false
+        }
     }
 
     pub fn get_corrections_prompt(&self, text: &str) -> String {

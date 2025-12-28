@@ -102,6 +102,6 @@ This document outlines the strategic phases for SpeechD-NG development.
 ## Phase 14: Hardening & Packaging (📋 Planned)
 **Goal**: Production readiness and distribution.
 -   [ ] **Packaging**: Create `.deb`, `.rpm`, and `Flatpak` manifests.
--   [ ] **Safety**: Implement `RollbackLastCorrection` to undo bad learning.
+-   [x] **Safety**: Implement `RollbackLastCorrection` to undo bad learning. (✅ Implemented)
 -   [ ] **Benchmarking**: Create latency/resource usage test suite.
 -   [ ] **CI Hardening**: Add offline-mode verification tests.

@@ -158,9 +158,19 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Add
 
 **Returns:** `true` if the pattern was added.
 
-**Notes:**
-- Manual corrections start at **70% confidence** (vs 10% for passive)
 - Confidence increases faster with repeated confirmations
+
+---
+
+### `RollbackLastCorrection() → bool`
+
+Undo the most recent voice pattern learning (manual or passive).
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service RollbackLastCorrection
+```
+
+**Returns:** `true` if a correction was rolled back.
 
 ---
 

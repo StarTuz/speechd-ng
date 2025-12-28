@@ -187,6 +187,11 @@ impl SpeechService {
         self.fingerprint.add_manual_correction(heard, meant)
     }
 
+    /// Undo the last correction (manual or passive)
+    async fn rollback_last_correction(&self) -> bool {
+        self.fingerprint.rollback_last_correction()
+    }
+
     /// Train a word by recording user speech and learning what ASR hears
     /// Returns (what_asr_heard, success)
     async fn train_word(&self, #[zbus(header)] header: Header<'_>, expected: String, duration_secs: u32) -> (String, bool) {

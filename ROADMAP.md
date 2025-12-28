@@ -93,8 +93,8 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **ListenVad D-Bus Method**: New API for VAD-based listening.
 -   [x] **Wake Word Integration**: Autonomous mode uses VAD.
 
-## Phase 13: Wyoming Protocol (📋 Future)
+## Phase 13: Wyoming Protocol (✅ Completed)
 **Goal**: Remote ASR via Wyoming protocol for better accuracy.
--   [ ] **Wyoming Client**: Stream audio to wyoming-whisper servers.
--   [ ] **Auto-Start Server**: Launch local Whisper server if needed.
--   [ ] **GPU Acceleration**: Support for remote GPU-powered transcription.
+-   [x] **Wyoming Client**: Stream audio to wyoming-whisper servers via `wyoming_bridge.py`.
+-   [x] **Configurable Backend**: Switch between `vosk` and `wyoming` in config.
+-   [x] **D-Bus Info API**: Get current backend info and status.

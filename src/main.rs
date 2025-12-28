@@ -282,6 +282,26 @@ impl SpeechService {
     async fn add_ignored_command(&self, heard: String, context: String) {
         self.fingerprint.add_ignored_command(&heard, &context)
     }
+
+    // ========== Phase 13: Wyoming Protocol ==========
+
+    /// Get current STT backend ("vosk" or "wyoming")
+    async fn get_stt_backend(&self) -> String {
+        crate::config_loader::SETTINGS.read()
+            .map(|s| s.stt_backend.clone())
+            .unwrap_or_else(|_| "vosk".to_string())
+    }
+
+    /// Get Wyoming server info (host, port, model)
+    async fn get_wyoming_info(&self) -> (String, u16, String, bool) {
+        let settings = crate::config_loader::SETTINGS.read().unwrap();
+        (
+            settings.wyoming_host.clone(),
+            settings.wyoming_port,
+            settings.wyoming_model.clone(),
+            settings.wyoming_auto_start,
+        )
+    }
 }
 
 #[tokio::main]

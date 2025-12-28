@@ -4,44 +4,48 @@
 
 We have completed **Phase 11** of the roadmap. **SpeechD-NG** is now a fully-featured, self-improving, hands-free speech assistant for Linux with comprehensive voice learning capabilities.
 
-## Status: Phase 11 Completed (Ignored Commands Tracking)
+## Status: Phase 12 Completed (Improved VAD) / Phase 13 In Progress
 
 ### Completed Phases
 
 | Phase | Feature | Status |
 |-------|---------|--------|
-| 1-8 | Core (D-Bus, TTS, STT, LLM, Wake Word, Passive Learning) | ✅ |
-| 9 | Manual Voice Training API | ✅ |
-| 10 | Pattern Import/Export | ✅ |
-| 11 | Ignored Commands Tracking | ✅ |
-| 12 | Improved VAD | 📋 Planned |
-| 13 | Wyoming Protocol | 📋 Future |
+| 1-11 | Core, AI, Training, Ignored Commands | ✅ |
+| 12 | Improved VAD (Voice Activity Detection) | ✅ |
+| 13 | Wyoming Protocol | 🚧 In Progress |
 
 ## Functional Features
 
 ### TTS & Speech
 -   **Neural TTS (Piper)**: High-quality voices with zero-config downloading
--   **Legacy TTS (eSpeak)**: Fast fallback synthesis
--   **Voice Selection**: Per-request voice selection via D-Bus
--   **SSIP Shim**: Legacy Orca compatibility (TCP 6560)
+-   **Legacy TTS (eSpeak)**: Fast fallback
+-   **SSIP Shim**: Orca compatibility
 
 ### AI & Context
--   **The Cortex**: Ollama integration for contextual understanding
--   **Speech Memory**: Rolling history of spoken text
--   **Query API**: Ask questions about recent speech
+-   **The Cortex**: Ollama integration
+-   **Speech Memory**: Rolling history
+-   **Voice Learning**: Manual training, Pattern Import/Export
+-   **Ignored Commands**: Track and correct failures
 
-### Wake Word & Autonomous Mode
--   **Background Listener**: Vosk-powered wake word detection
--   **Command Loop**: STANDBY → WAKE → CAPTURE → THINK → RESPOND
--   **Configurable**: Custom wake word via config
+### Listening & VAD (Phase 12)
+-   **Energy-Based VAD**: Detects speech vs silence naturally
+-   **Autonomous Mode**: Uses VAD for fluid conversation
+-   **ListenVad API**: D-Bus method for VAD-based recording
+-   **Configurable**: Thresholds in `Speech.toml`
 
-### Voice Learning (Phases 8-11)
--   **Passive Learning**: Auto-learns from LLM corrections
--   **Manual Training**: Explicit word training via D-Bus
--   **Pattern Management**: Import/export learned patterns
--   **Ignored Commands**: Track and correct failed ASR attempts
+### Wyoming Protocol (Phase 13 WIP)
+-   **Architecture**: `src/wyoming_bridge.py` communicates with `wyoming-faster-whisper`
+-   **Config**: `stt_backend = "wyoming"` config option added
+-   **Goal**: Remote/Containerized ASR for better performance
 
 ## D-Bus API Summary
+
+**VAD (Phase 12):**
+- `ListenVad()` - Record until silence
+
+**Configuration (Phase 13):**
+- `GetSttBackend()` - Get current backend (vosk/wyoming)
+- `GetWyomingInfo()` - Get host/port/model info
 
 ### Service Details
 | Property | Value |

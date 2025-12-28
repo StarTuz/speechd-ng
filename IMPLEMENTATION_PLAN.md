@@ -222,7 +222,7 @@ wyoming_auto_start = true
 | 10 | Pattern Import/Export | 1 hour | ✅ Complete |
 | 11 | Ignored Commands | 1-2 hours | ✅ Complete |
 | 12 | Improved VAD | 2-3 hours | ✅ Complete |
-| 13 | Wyoming Protocol | 4-6 hours | 📋 Future |
+| 13 | Wyoming Protocol | 4-6 hours | ✅ Complete |
 
 ---
 

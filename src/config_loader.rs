@@ -19,6 +19,12 @@ pub struct Settings {
     pub vad_silence_threshold: i16,
     pub vad_silence_duration_ms: u64,
     pub vad_max_duration_ms: u64,
+    // Wyoming Settings (Phase 13)
+    pub stt_backend: String,       // "vosk" or "wyoming"
+    pub wyoming_host: String,
+    pub wyoming_port: u16,
+    pub wyoming_auto_start: bool,
+    pub wyoming_model: String,     // "tiny", "base", "small", "medium", "large"
 }
 
 impl Default for Settings {
@@ -38,6 +44,12 @@ impl Default for Settings {
             vad_silence_threshold: 400,
             vad_silence_duration_ms: 1500,
             vad_max_duration_ms: 15000,
+            // Wyoming defaults
+            stt_backend: "vosk".to_string(),
+            wyoming_host: "127.0.0.1".to_string(),
+            wyoming_port: 10301,
+            wyoming_auto_start: true,
+            wyoming_model: "tiny".to_string(),
         }
     }
 }
@@ -66,6 +78,12 @@ impl Settings {
             .set_default("vad_silence_threshold", 400)?
             .set_default("vad_silence_duration_ms", 1500)?
             .set_default("vad_max_duration_ms", 15000)?
+            // Wyoming defaults
+            .set_default("stt_backend", "vosk")?
+            .set_default("wyoming_host", "127.0.0.1")?
+            .set_default("wyoming_port", 10301)?
+            .set_default("wyoming_auto_start", true)?
+            .set_default("wyoming_model", "tiny")?
             // Merge with local config file (if exists)
             .add_source(File::with_name("Speech").required(false))
             .add_source(File::with_name(&format!("{}/.config/speechd-ng/Speech", std::env::var("HOME").unwrap_or_default())).required(false))

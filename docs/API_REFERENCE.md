@@ -328,6 +328,36 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Add
 
 ---
 
+## Configuration (Phase 13)
+
+### `GetSttBackend() → String`
+
+Get the currently configured STT backend.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service GetSttBackend
+```
+
+**Returns:** `"vosk"` or `"wyoming"`.
+
+---
+
+### `GetWyomingInfo() → (host: String, port: u16, model: String, auto_start: bool)`
+
+Get configuration details for the Wyoming protocol integration.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service GetWyomingInfo
+```
+
+**Returns:**
+- `host`: Wyoming server host (e.g., `127.0.0.1`)
+- `port`: Wyoming server port (e.g., `10301`)
+- `model`: Configured Whisper model (e.g., `tiny`, `base`)
+- `auto_start`: Whether the server is auto-started
+
+---
+
 ## Python Integration Example
 
 ```python

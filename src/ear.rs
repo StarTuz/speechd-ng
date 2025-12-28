@@ -430,7 +430,22 @@ impl Ear {
         self.transcribe_cli(path).unwrap_or_else(|e| format!("STT Error: {}", e))
     }
 
+    /// Transcribe audio file using configured STT backend
     fn transcribe_cli(&self, path: &str) -> Result<String, String> {
+        let stt_backend = {
+            crate::config_loader::SETTINGS.read()
+                .map(|s| s.stt_backend.clone())
+                .unwrap_or_else(|_| "vosk".to_string())
+        };
+
+        match stt_backend.as_str() {
+            "wyoming" => self.transcribe_wyoming(path),
+            _ => self.transcribe_vosk(path),
+        }
+    }
+
+    /// Transcribe using Vosk CLI
+    fn transcribe_vosk(&self, path: &str) -> Result<String, String> {
         let txt_path = path.replace(".wav", ".txt");
         let output = Command::new("vosk-transcriber")
             .arg("-i").arg(path)
@@ -445,6 +460,90 @@ impl Ear {
         }
         Err("Vosk transcriber failed".to_string())
     }
+
+    /// Transcribe using Wyoming bridge (streams to Wyoming-Whisper server)
+    fn transcribe_wyoming(&self, wav_path: &str) -> Result<String, String> {
+        let (host, port) = {
+            let settings = crate::config_loader::SETTINGS.read()
+                .map_err(|_| "Settings lock error".to_string())?;
+            (settings.wyoming_host.clone(), settings.wyoming_port)
+        };
+
+        println!("Ear: [Wyoming] Transcribing via {}:{}", host, port);
+
+        // Find the Wyoming bridge script
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let bridge_path = if let Ok(mut exe_path) = std::env::current_exe() {
+            exe_path.pop();
+            let local_bridge = exe_path.join("wyoming_bridge.py");
+            if local_bridge.exists() {
+                local_bridge
+            } else {
+                let mut p = exe_path.clone();
+                p.pop(); p.pop();
+                let src_bridge = p.join("src/wyoming_bridge.py");
+                if src_bridge.exists() {
+                    src_bridge
+                } else {
+                    std::path::PathBuf::from(format!("{}/Code/speechserverdaemon/src/wyoming_bridge.py", home))
+                }
+            }
+        } else {
+            std::path::PathBuf::from(format!("{}/Code/speechserverdaemon/src/wyoming_bridge.py", home))
+        };
+
+        // Convert WAV to raw PCM 16-bit mono 16kHz for Wyoming
+        let pcm_path = wav_path.replace(".wav", ".pcm");
+        let ffmpeg_result = Command::new("ffmpeg")
+            .args(["-y", "-i", wav_path, "-f", "s16le", "-ar", "16000", "-ac", "1", &pcm_path])
+            .stderr(Stdio::null())
+            .output();
+
+        if ffmpeg_result.is_err() {
+            return Err("FFmpeg conversion failed".to_string());
+        }
+
+        // Read PCM data and pipe to Wyoming bridge
+        let pcm_data = std::fs::read(&pcm_path).map_err(|e| format!("Read PCM error: {}", e))?;
+        let _ = std::fs::remove_file(&pcm_path); // Cleanup
+
+        let mut child = Command::new("python3")
+            .arg(&bridge_path)
+            .arg("--host").arg(&host)
+            .arg("--port").arg(port.to_string())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to start Wyoming bridge: {}", e))?;
+
+        // Write PCM data to bridge stdin
+        if let Some(ref mut stdin) = child.stdin {
+            let _ = stdin.write_all(&pcm_data);
+        }
+        drop(child.stdin.take());
+
+        // Read transcript from stdout
+        let output = child.wait_with_output().map_err(|e| format!("Wait error: {}", e))?;
+        
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        
+        // Parse "TRANSCRIPT: <text>" from output
+        for line in stdout.lines() {
+            if line.starts_with("TRANSCRIPT:") {
+                let transcript = line.trim_start_matches("TRANSCRIPT:").trim();
+                println!("Ear: [Wyoming] Got transcript: '{}'", transcript);
+                return Ok(transcript.to_string());
+            }
+        }
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if !stderr.is_empty() {
+            println!("Ear: [Wyoming] Bridge stderr: {}", stderr);
+        }
+
+        Err("Wyoming transcription failed".to_string())
+    }
 }
 
 // VAD State Machine
@@ -454,3 +553,4 @@ enum VadState {
     Speaking,  // Speech detected, recording
     Done,      // Recording complete
 }
+

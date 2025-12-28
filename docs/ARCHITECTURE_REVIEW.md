@@ -23,7 +23,8 @@
 - **VAD (Voice Activity Detection)**: Implemented (Phase 12) to only record when speech is detected.
 - **Wake Word**: Uses `vosk-model-small`, which is lightweight (~50MB RAM).
 - **CPU Usage**: Observed ~5-10% usage on a single core during active listening.
-- **Future Work**: Benchmark on Raspberry Pi 4/5.
+- **Future Work**: Benchmark on Raspberry Pi 4/5. 
+- **Recommendation**: Use hardware-accelerated VAD (e.g., on-device DSP) for embedded targets to reduce CPU load.
 
 ## 4. Security
 **Layering**:
@@ -39,6 +40,7 @@
 **Mitigation**:
 - **Confidence**: Passive patterns are marked with significantly lower confidence than manual training.
 - **Export/Import**: Users can backup their fingerprint file.
+- **Auditing**: All passive corrections are logged. Confidence thresholds are configurable (`passive_confidence_threshold`).
 - **Future Work**: `RollbackLastCorrection` method; UI for pattern review.
 
 ## 6. Compatibility
@@ -50,6 +52,7 @@
 
 ## 7. Action Items (Future Roadmap)
 - [ ] Create `.deb` / `.rpm` packaging scripts.
-- [ ] Add `enable_ai = false` config option.
+- [ ] Add `enable_ai = false` config option. (✅ Completed)
 - [ ] Implement `Rollback` and specialized "Safety" UI.
 - [ ] Benchmark suite for latency measurements.
+- [ ] **CI**: Add explicit offline-mode test (network disabled, Ollama unreachable) to verification pipeline.

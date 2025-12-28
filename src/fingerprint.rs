@@ -76,6 +76,10 @@ impl Fingerprint {
             return;
         }
 
+        let initial_confidence = crate::config_loader::SETTINGS.read()
+            .map(|s| s.passive_confidence_threshold)
+            .unwrap_or(0.1);
+
         let mut data = self.data.lock().unwrap();
         let entry = data.patterns.entry(heard.to_lowercase()).or_insert(Pattern {
             correction: meant.to_lowercase(),
@@ -89,19 +93,23 @@ impl Fingerprint {
             // Confidence increases with frequency, maxing at 1.0 after 10 successes
             entry.confidence = (entry.count as f32 / 10.0).min(1.0);
         } else {
-            // If it conflicts, reset to new correction
+            // If it conflicts, reset to new correction with base confidence
+            println!("Fingerprint: Passive correction override: '{}' was '{}', now '{}'", 
+                heard, entry.correction, meant);
             entry.correction = meant.to_lowercase();
             entry.count = 1;
-            entry.confidence = 0.1;
+            entry.confidence = initial_confidence;
             entry.source = "passive".to_string();
         }
         
+        println!("Fingerprint: Passive learned '{}' -> '{}' (conf: {:.2})", heard, meant, entry.confidence);
+
         // Save history (last 100 commands)
         data.command_history.push(meant);
         if data.command_history.len() > 100 {
             data.command_history.remove(0);
         }
-
+        
         self.save(&data);
     }
 

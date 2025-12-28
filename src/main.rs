@@ -9,6 +9,7 @@ mod fingerprint;
 use engine::AudioEngine;
 use cortex::Cortex;
 use ear::Ear;
+use fingerprint::Fingerprint;
 use security::SecurityAgent;
 use std::error::Error;
 use std::future::pending;
@@ -19,6 +20,7 @@ struct SpeechService {
     engine: Arc<Mutex<AudioEngine>>,
     cortex: Cortex,
     ear: Arc<Mutex<Ear>>,
+    fingerprint: Fingerprint,
 }
 
 #[interface(name = "org.speech.Service")]
@@ -136,6 +138,77 @@ impl SpeechService {
             Err(e) => format!("Error joining audio task: {}", e),
         }
     }
+
+    // ========== Phase 9: Voice Training API ==========
+
+    /// Add a manual voice correction (heard -> meant)
+    /// This is used when the user knows what ASR mishears
+    async fn add_correction(&self, heard: String, meant: String) -> bool {
+        println!("Adding manual correction: '{}' -> '{}'", heard, meant);
+        self.fingerprint.add_manual_correction(heard, meant)
+    }
+
+    /// Train a word by recording user speech and learning what ASR hears
+    /// Returns (what_asr_heard, success)
+    async fn train_word(&self, #[zbus(header)] header: Header<'_>, expected: String, duration_secs: u32) -> (String, bool) {
+        if let Err(e) = SecurityAgent::check_permission(&header, "org.speech.service.train").await {
+            eprintln!("Access Denied for TrainWord: {}", e);
+            return ("Access Denied".to_string(), false);
+        }
+
+        println!("Training word '{}' for {} seconds...", expected, duration_secs);
+        
+        let ear = self.ear.clone();
+        let fingerprint = self.fingerprint.clone();
+        let expected_clone = expected.clone();
+        
+        let result = tokio::task::spawn_blocking(move || {
+            if let Ok(ear_guard) = ear.lock() {
+                // Record and transcribe
+                let heard = ear_guard.record_and_transcribe(duration_secs as u64);
+                let heard_trimmed = heard.trim().to_string();
+                
+                if heard_trimmed.is_empty() {
+                    return ("[no speech detected]".to_string(), false);
+                }
+                
+                // Learn the correction
+                let success = fingerprint.add_manual_correction(heard_trimmed.clone(), expected_clone);
+                (heard_trimmed, success)
+            } else {
+                ("Error: Ear locked".to_string(), false)
+            }
+        }).await;
+
+        match result {
+            Ok((heard, success)) => {
+                // Audio feedback on success
+                if success {
+                    let feedback = format!("I heard {}. I'll remember that means {}.", heard, expected);
+                    if let Ok(engine) = self.engine.lock() {
+                        engine.speak(&feedback, None);
+                    }
+                }
+                (heard, success)
+            },
+            Err(e) => (format!("Error: {}", e), false),
+        }
+    }
+
+    /// Get fingerprint statistics (manual_patterns, passive_patterns, command_count)
+    async fn get_fingerprint_stats(&self) -> (u32, u32, u32) {
+        self.fingerprint.get_stats()
+    }
+
+    /// List all learned patterns (for debugging/UI)
+    async fn list_patterns(&self) -> Vec<(String, String, String)> {
+        self.fingerprint.get_all_patterns()
+            .into_iter()
+            .map(|(heard, meant, conf, source)| {
+                (heard, meant, format!("{:.0}% ({})", conf * 100.0, source))
+            })
+            .collect()
+    }
 }
 
 #[tokio::main]
@@ -143,13 +216,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let engine = Arc::new(Mutex::new(AudioEngine::new()));
     let cortex = Cortex::new();
     let ear = Arc::new(Mutex::new(Ear::new()));
+    let fingerprint = Fingerprint::new();
 
     let _conn = Builder::session()?
         .name("org.speech.Service")?
         .serve_at("/org/speech/Service", SpeechService { 
             engine: engine.clone(), 
             cortex: cortex.clone(), 
-            ear: ear.clone() 
+            ear: ear.clone(),
+            fingerprint: fingerprint.clone(),
         })?
         .build()
         .await?;

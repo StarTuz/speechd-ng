@@ -195,7 +195,8 @@ impl Ear {
         });
     }
 
-    fn record_and_transcribe(&self, seconds: u64) -> String {
+    /// Record audio for specified duration and transcribe it
+    pub fn record_and_transcribe(&self, seconds: u64) -> String {
         let path = "/tmp/recorded_speech.wav";
         
         let host = cpal::default_host();

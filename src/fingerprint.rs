@@ -9,6 +9,8 @@ pub struct Pattern {
     pub correction: String,
     pub count: u32,
     pub confidence: f32,
+    #[serde(default)]
+    pub source: String,  // "passive" or "manual"
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -58,6 +60,7 @@ impl Fingerprint {
         }
     }
 
+    /// Passive learning from LLM corrections (lower initial confidence)
     pub fn learn(&self, heard: String, meant: String) {
         if heard.is_empty() || meant.is_empty() || heard == meant {
             return;
@@ -68,6 +71,7 @@ impl Fingerprint {
             correction: meant.to_lowercase(),
             count: 0,
             confidence: 0.0,
+            source: "passive".to_string(),
         });
 
         if entry.correction == meant.to_lowercase() {
@@ -79,6 +83,7 @@ impl Fingerprint {
             entry.correction = meant.to_lowercase();
             entry.count = 1;
             entry.confidence = 0.1;
+            entry.source = "passive".to_string();
         }
         
         // Save history (last 100 commands)
@@ -88,6 +93,47 @@ impl Fingerprint {
         }
 
         self.save(&data);
+    }
+
+    /// Manual learning from explicit user training (higher initial confidence)
+    /// Returns true if the pattern was added/updated
+    pub fn add_manual_correction(&self, heard: String, meant: String) -> bool {
+        if heard.is_empty() || meant.is_empty() || heard == meant {
+            return false;
+        }
+
+        let mut data = self.data.lock().unwrap();
+        let heard_lower = heard.to_lowercase();
+        let meant_lower = meant.to_lowercase();
+        
+        // Manual corrections start with high confidence (0.7) and boost quickly
+        let entry = data.patterns.entry(heard_lower.clone()).or_insert(Pattern {
+            correction: meant_lower.clone(),
+            count: 0,
+            confidence: 0.0,
+            source: "manual".to_string(),
+        });
+
+        if entry.correction == meant_lower {
+            entry.count += 1;
+            // Manual patterns reach max confidence faster (after 3 confirmations)
+            entry.confidence = (0.7 + (entry.count as f32 * 0.1)).min(1.0);
+        } else {
+            // Override with new correction
+            entry.correction = meant_lower;
+            entry.count = 1;
+            entry.confidence = 0.7;  // Start high for manual
+            entry.source = "manual".to_string();
+        }
+
+        // Capture values for logging before dropping the mutable reference
+        let correction = entry.correction.clone();
+        let confidence = entry.confidence;
+
+        self.save(&data);
+        println!("Fingerprint: Learned '{}' → '{}' (manual, confidence: {:.0}%)", 
+            heard, correction, confidence * 100.0);
+        true
     }
 
     pub fn get_corrections_prompt(&self, text: &str) -> String {
@@ -118,6 +164,27 @@ impl Fingerprint {
             format!("\nPERSONALIZED CORRECTIONS (learned from this user's voice):\n{}\n", 
                 prompt_parts.join("\n"))
         }
+    }
+
+    /// Get statistics about the fingerprint
+    pub fn get_stats(&self) -> (u32, u32, u32) {
+        let data = self.data.lock().unwrap();
+        let manual_count = data.patterns.values()
+            .filter(|p| p.source == "manual")
+            .count() as u32;
+        let passive_count = data.patterns.values()
+            .filter(|p| p.source != "manual")
+            .count() as u32;
+        let command_count = data.command_history.len() as u32;
+        (manual_count, passive_count, command_count)
+    }
+
+    /// Get all patterns for debugging/export
+    pub fn get_all_patterns(&self) -> Vec<(String, String, f32, String)> {
+        let data = self.data.lock().unwrap();
+        data.patterns.iter()
+            .map(|(heard, p)| (heard.clone(), p.correction.clone(), p.confidence, p.source.clone()))
+            .collect()
     }
 
     fn save(&self, data: &FingerprintData) {

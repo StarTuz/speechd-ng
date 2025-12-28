@@ -63,11 +63,13 @@ This document outlines the strategic phases for SpeechD-NG development.
 
 > See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for detailed implementation steps.
 
-## Phase 9: Manual Voice Training (📋 Planned)
+## Phase 9: Manual Voice Training (✅ Completed)
 **Goal**: Explicit user-driven voice training for problematic words.
--   [ ] **TrainWord D-Bus Method**: Record user saying a word, learn ASR error patterns.
--   [ ] **AddCorrection D-Bus Method**: Directly add correction without recording.
--   [ ] **Training Feedback**: Speak confirmation of what was learned.
+-   [x] **TrainWord D-Bus Method**: Record user saying a word, learn ASR error patterns.
+-   [x] **AddCorrection D-Bus Method**: Directly add correction without recording.
+-   [x] **ListPatterns D-Bus Method**: List all learned patterns for debugging/UI.
+-   [x] **GetFingerprintStats D-Bus Method**: Quick overview of learning status.
+-   [x] **Training Feedback**: Speak confirmation of what was learned.
 
 ## Phase 10: Pattern Import/Export (📋 Planned)
 **Goal**: Share and backup voice patterns.

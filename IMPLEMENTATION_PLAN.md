@@ -4,12 +4,12 @@ This document outlines the next phases of development for SpeechD-NG, focused on
 
 ## Current Status
 
-**Phases 1-8**: ✅ Complete
-- Core D-Bus service, TTS engines, STT, LLM integration, wake word, passive learning
+**Phases 1-9**: ✅ Complete
+- Core D-Bus service, TTS engines, STT, LLM integration, wake word, passive learning, **manual training**
 
 ---
 
-## Phase 9: Manual Voice Training API
+## Phase 9: Manual Voice Training API ✅ COMPLETE
 
 **Goal**: Allow users to explicitly train problematic words for higher accuracy.
 
@@ -20,23 +20,27 @@ Users can teach the system words that ASR consistently mishears. Unlike passive 
 
 ### Implementation Steps
 
-#### 9.1 Extend Fingerprint Module
-- [ ] Add `add_manual_correction(heard: String, meant: String)` method
-- [ ] Manual corrections get higher base confidence (0.7 vs 0.3 for passive)
-- [ ] Store source type: `"passive"` or `"manual"` per pattern
+#### 9.1 Extend Fingerprint Module ✅
+- [x] Add `add_manual_correction(heard: String, meant: String)` method
+- [x] Manual corrections get higher base confidence (0.7 vs 0.3 for passive)
+- [x] Store source type: `"passive"` or `"manual"` per pattern
 
-#### 9.2 Add D-Bus Training Methods
-- [ ] `TrainWord(expected: String, duration_secs: u32) -> (heard: String, success: bool)`
+#### 9.2 Add D-Bus Training Methods ✅
+- [x] `TrainWord(expected: String, duration_secs: u32) -> (heard: String, success: bool)`
   - Records audio for `duration_secs`
   - Transcribes using STT
   - Stores `heard → expected` mapping with high confidence
-- [ ] `AddCorrection(heard: String, meant: String) -> bool`
+- [x] `AddCorrection(heard: String, meant: String) -> bool`
   - Direct API for adding corrections without recording
   - Useful for GUI tools or automated imports
+- [x] `ListPatterns() -> Vec<(heard, meant, confidence_info)>`
+  - List all learned patterns for debugging/UI
+- [x] `GetFingerprintStats() -> (manual_count, passive_count, command_count)`
+  - Quick overview of learning status
 
-#### 9.3 Training Feedback
-- [ ] Return what ASR actually heard for user verification
-- [ ] Speak confirmation: "I heard 'X'. I'll remember that means 'Y'."
+#### 9.3 Training Feedback ✅
+- [x] Return what ASR actually heard for user verification
+- [x] Speak confirmation: "I heard 'X'. I'll remember that means 'Y'."
 
 ### Files to Modify
 - `src/fingerprint.rs` - Add manual correction method
@@ -76,8 +80,8 @@ Fingerprint data is already stored as JSON. Expose D-Bus methods to export/impor
   - If `merge=false`: Replaces current fingerprint entirely
   - Returns count of patterns imported
 
-#### 10.3 Pattern Stats
-- [ ] `GetFingerprintStats() -> (pattern_count: u32, command_count: u32, last_updated: String)`
+#### 10.3 Pattern Stats ✅ (Already implemented in Phase 9)
+- [x] `GetFingerprintStats() -> (manual_count, passive_count, command_count)`
   - Quick overview of fingerprint status
 
 ### Files to Modify
@@ -199,13 +203,13 @@ wyoming_auto_start = true
 
 ## Summary Timeline
 
-| Phase | Feature | Est. Time | Dependencies |
-|-------|---------|-----------|--------------|
-| 9 | Manual Voice Training | 2-3 hours | None |
-| 10 | Pattern Import/Export | 1 hour | None |
-| 11 | Ignored Commands | 1-2 hours | Phase 9 (similar patterns) |
-| 12 | Improved VAD | 2-3 hours | None |
-| 13 | Wyoming Protocol | 4-6 hours | Phase 12 (VAD useful) |
+| Phase | Feature | Est. Time | Status |
+|-------|---------|-----------|--------|
+| 9 | Manual Voice Training | 2-3 hours | ✅ Complete |
+| 10 | Pattern Import/Export | 1 hour | 📋 Planned |
+| 11 | Ignored Commands | 1-2 hours | 📋 Planned |
+| 12 | Improved VAD | 2-3 hours | 📋 Planned |
+| 13 | Wyoming Protocol | 4-6 hours | 📋 Future |
 
 ---
 

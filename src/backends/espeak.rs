@@ -11,10 +11,6 @@ impl EspeakBackend {
 }
 
 impl SpeechBackend for EspeakBackend {
-    fn id(&self) -> &'static str {
-        "espeak-ng"
-    }
-
     fn list_voices(&self) -> Result<Vec<Voice>> {
         use std::process::Command;
         use crate::backends::Voice;

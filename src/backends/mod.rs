@@ -1,6 +1,5 @@
 pub mod espeak;
-
-
+pub mod piper;
 
 /// Represents a text-to-speech voice
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -17,9 +16,16 @@ pub trait SpeechBackend: Send + Sync {
     /// 'voice' is an optional specific voice ID to use
     fn synthesize(&self, text: &str, voice: Option<&str>) -> std::io::Result<Vec<u8>>;
     
-    /// Returns the unique ID of the backend (e.g., "espeak-ng")
-    fn id(&self) -> &'static str;
-
-    /// Returns a list of supported voices
+    /// Returns a list of supported voices installed locally
     fn list_voices(&self) -> std::io::Result<Vec<Voice>>;
+
+    /// Returns a list of voices available for download (optional)
+    fn list_downloadable_voices(&self) -> std::io::Result<Vec<Voice>> {
+        Ok(Vec::new())
+    }
+
+    /// Downloads a voice given its ID (optional)
+    fn download_voice(&self, _voice_id: &str) -> std::io::Result<()> {
+        Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "Downloading not supported for this backend"))
+    }
 }

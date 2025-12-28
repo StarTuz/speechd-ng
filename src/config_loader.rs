@@ -7,8 +7,12 @@ use lazy_static::lazy_static;
 pub struct Settings {
     pub ollama_url: String,
     pub ollama_model: String,
+    pub piper_model: String,
+    pub tts_backend: String,
     pub memory_size: usize,
     pub enable_audio: bool,
+    pub wake_word: String,
+    pub enable_wake_word: bool,
 }
 
 impl Default for Settings {
@@ -16,8 +20,12 @@ impl Default for Settings {
         Self {
             ollama_url: "http://localhost:11434".to_string(),
             ollama_model: "llama3".to_string(),
+            piper_model: "en_US-lessac-medium".to_string(),
+            tts_backend: "espeak".to_string(),
             memory_size: 50,
             enable_audio: true,
+            wake_word: "startuz".to_string(),
+            enable_wake_word: false,
         }
     }
 }
@@ -34,10 +42,15 @@ impl Settings {
             // Connect to defaults
             .set_default("ollama_url", "http://localhost:11434")?
             .set_default("ollama_model", "llama3")?
+            .set_default("piper_model", "en_US-lessac-medium")?
+            .set_default("tts_backend", "espeak")?
             .set_default("memory_size", 50)?
             .set_default("enable_audio", true)?
+            .set_default("wake_word", "startuz")?
+            .set_default("enable_wake_word", false)?
             // Merge with local config file (if exists)
             .add_source(File::with_name("Speech").required(false))
+            .add_source(File::with_name(&format!("{}/.config/speechd-ng/Speech", std::env::var("HOME").unwrap_or_default())).required(false))
             // Merge with environment variables (e.g. SPEECH_OLLAMA_URL)
             .add_source(config::Environment::with_prefix("SPEECH"));
 

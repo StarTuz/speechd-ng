@@ -5,31 +5,25 @@
 ## 🚀 Mission
 1.  **Window Manager Agnostic**: Works flawlessly on GNOME, KDE, Sway, Hyprland, and raw TTYs.
 2.  **Service-Based**: Runs as a standard `systemd` service (User or System).
-3.  **Secure by Design**: Uses D-Bus for IPC with strict isolation.
-4.  **AI-Ready**: Built to integrate with local LLMs (like Ollama) for passive/active learning *without* blocking critical audio paths.
-5.  **Fast**: Rust-based core with asynchronous audio processing.
+3.  **Secure by Design**: Uses D-Bus for IPC with strict isolation and Polkit authorization.
+4.  **AI-Ready**: Built to integrate with local LLMs (like Ollama) for passive/active learning.
+5.  **Neural First**: First-class support for high-quality Piper neural voices with automated model downloading.
+6.  **Autonomous**: Integrated wake word detection for hands-free interaction.
 
 ## 🏗 Architecture
 
-The system is composed of three main layers:
-
-1.  **The Daemon (Core)**:
-    -   **Technology**: Rust + `zbus`.
-    -   **Role**: Extremely lightweight router. Accepts D-Bus calls, manages state, and enforces security.
-    -   **Status**: ✅ Implemented.
-3.  **The Cortex**:
-    -   **Technology**: Asynchronous Tokio tasks + HTTP (Ollama).
-    -   **Role**: "The Brain". Listens to speech history and context to provide Active/Passive learning features (e.g., "Recall what I said 5 minutes ago").
-    -   **Status**: ✅ Implemented (Security Hardened).
+1.  **The Daemon (Core)**: Rust + `zbus`. Extremely lightweight router.
+2.  **The Audio Engine**: Multi-backend mixer supporting `eSpeak-ng` and `Piper`.
+3.  **The Ear**: Native audio capture with offline STT (Vosk/Whisper) and Wake Word detection.
+4.  **The Cortex**: Async Ollama connector for context-aware "thinking" and summaries.
 
 ## 🛠 Building & Installation
 
 ### Prerequisites
 -   Rust (Stable)
--   `espeak-ng` (Runtime dependency for synthesis)
--   `libdbus-1-dev` (Usually pre-installed)
--   `openai-whisper` (Optional, for Speech-to-Text)
--   `vosk` (Optional, alternative Low-Latency STT)
+-   `espeak-ng` (Runtime for fast synthesis)
+-   `piper` (High-quality neural synthesis)
+-   `vosk` (Python package for wake word and STT)
 -   `Ollama` (Optional, for "Brain" features)
 
 ### Build
@@ -51,50 +45,28 @@ cargo build --release
 
 ## 📡 API Usage (D-Bus)
 
-You can interact with the daemon using any D-Bus compliant tool or library.
-
-**Bus**: Session Bus (`--user`)
-**Service Name**: `org.speech.Service`
-**Object Path**: `/org/speech/Service`
-**Interface**: `org.speech.Service`
-
 ### Example: Command Line
 ```bash
-# Speak (Default Voice)
-busctl --user call \
-    org.speech.Service \
-    /org/speech/Service \
-    org.speech.Service \
-    Speak s "Hello world."
+# Speak (Premium Neural Voice)
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service Speak s "Hello world"
 
-# List Available Voices
-# Returns array of (ID, Name) tuples
-busctl --user call \
-    org.speech.Service \
-    /org/speech/Service \
-    org.speech.Service \
-    ListVoices
+# List All Remote Neural Voices
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service ListDownloadableVoices
 
-# Speak with Specific Voice
-busctl --user call \
-    org.speech.Service \
-    /org/speech/Service \
-    org.speech.Service \
-    SpeakVoice ss "Hello, I am British." "en-gb"
+# Download a Neural Voice
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service DownloadVoice s "piper:en_US-amy-low"
 
-# Think (Brain) - asks Ollama about the context
-busctl --user call \
-    org.speech.Service \
-    /org/speech/Service \
-    org.speech.Service \
-    Think s "Summarize what you just said."
+# Hands-Free Interaction
+# Simply say "StarTuz" (or your configured wake word)
+# The daemon will respond "Yes?" and record your next 4 seconds of speech.
 ```
 
 ## 🗺 Roadmap
 
--   **Phase 1: Foundation** (✅ Completed) - Basic D-Bus Daemon.
--   **Phase 2: Audio Engine** (✅ Completed) - Thread-safe Audio Synthesis.
--   **Phase 3: The Cortex** (✅ Completed) - Ollama Integration & Context API.
--   **Phase 4: Security & Config** (✅ Completed) - Systemd Sandboxing, LLM Sanitization, Config Loader.
--   **Phase 5: Voice System** (✅ Completed) - Pluggable Backends (Plugin System), Voice Enumeration, Timeouts.
--   **Phase 6: Input & STT** (🚧 Next Up) - Microphone handling & Speech-to-Text streams.
+-   **Phase 1: Foundation** (✅ Core D-Bus)
+-   **Phase 2: Audio Engine** (✅ rodio + eSpeak)
+-   **Phase 3: The Cortex** (✅ Ollama + History)
+-   **Phase 4: Security** (✅ Polkit + Systemd Sandboxing)
+-   **Phase 5: Premium Voices** (✅ Piper + Zero-Config Downloader)
+-   **Phase 6: Accessibility** (✅ STT + SSIP/Orca Shim)
+-   **Phase 7: Autonomous** (✅ Wake Word + Command Loop)

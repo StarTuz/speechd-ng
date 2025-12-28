@@ -1,40 +1,43 @@
 # Project Handoff: SpeechD-NG
 
 ## Current Context
-We are building **SpeechD-NG**, a modern replacement for Linux command-line/desktop speech services. The project is written in **Rust** to ensure memory safety, speed, and concurrency.
+We have completed **Phase 7** of the roadmap. **SpeechD-NG** is now a fully capable, secure, and hands-free speech assistant for Linux. It supports high-quality neural voices and autonomous voice interaction.
 
-## Status: Phase 6 Completed (Input & Accessibility)
-We have implemented Microphone access, STT wiring, and Legacy Compatibility.
+## Status: Phase 7 Completed (Hands-Free & Neural Voices)
 
 ### 1. Functional Features
--   **Audio Pipeline**: Threaded audio engine + `cpal` Microphone stream.
--   **D-Bus API**: `Listen()` method records 3 seconds of audio and attempts transcription.
--   **SSIP Shim**: Listens on TCP 6560 to accept legacy `speech-dispatcher` commands (e.g. from Orca).
--   **STT**: Wires up to `whisper` CLI.
+-   **Neural TTS (Piper)**: Seamless integration with Piper. Intelligent mixer handles `piper:` and `espeak:` prefixes.
+-   **Zero-Config Downloader**: Securely download high-fidelity voices from Hugging Face via D-Bus.
+-   **Autonomous Mode**: Background wake word listener ("StarTuz") triggers command capture.
+-   **Voice Command Loop**: STANDBY -> WAKE -> CAPTURE -> THINK -> RESPOND.
+-   **Legacy Compat**: SSIP Shim (TCP 6560) for Orca support.
 
 ### 2. Architecture & Security
--   **Audio Input**: `Ear` actor manages input stream. Offloaded to blocking thread.
--   **Legacy Compat**: `ssip.rs` implements partial Speech Synthesis Interface Protocol.
--   **Security**: `Listen` gated by Polkit. SSIP via local TCP (Implicit trust).
+-   **Hybrid Input**: Rust `Ear` uses a Python-Vosk bridge (`wakeword_bridge.py`) for efficient, stable keyword spotting.
+-   **Managed Downloads**: Piper models are stored in `~/.local/share/piper/models`.
+-   **Systemd Sandbox**: Updated to allow network access to Hugging Face and write access to model directories.
+-   **Polkit**: enforced for `Listen`, `Think`, and `DownloadVoice` methods.
 
 ## File Structure
 ```
 src/
-├── main.rs          # D-Bus & SSIP Task Launcher
-├── engine.rs        # Audio Output
-├── ear.rs           # Audio Input (Recording + Transcribe)
-├── ssip.rs          # Legacy Protocol Shim (TCP 6560)
-├── backends/        # TTS Plugins
+├── main.rs          # D-Bus & Autonomous Loop
+├── engine.rs        # Audio Engine (Mixer)
+├── ear.rs           # Audio Input (Manual & Autonomous)
+├── cortex.rs        # Memory & LLM Integration
+├── backends/        # TTS Engines (Piper, eSpeak)
+├── ssip.rs          # Legacy Shim
+└── wakeword_bridge.py # Python/Vosk Standby Listener
 ```
 
-## Immediate Next Steps (Future)
--   **Continuous Listening**: Wake word detection.
--   **Refinement**: Improve SSIP coverage (Events, Indices).
--   **Packaging**: Create .deb/rpm/flatpak.
+## Setup & Testing
+1. Ensure `vosk-transcriber` and `piper` are in PATH.
+2. Set `enable_wake_word = true` in `~/.config/speechd-ng/Speech.toml`.
+3. Say **"StarTuz"** to trigger.
 
 ## Known Limitations
--   **STT**: Requires external `whisper` binary.
--   **SSIP**: Minimal implementation (SPEAK/SET only).
+-   **Microphone Exclusivity**: If another app uses the mic exclusively, the wake word listener might fail (PulseAudio/Pipewire handles this usually).
+-   **Manual Paths**: The bridge looks for models in `~/.cache/vosk/`.
 
 ## Repository
 -   **GitHub**: https://github.com/StarTuz/speechd-ng

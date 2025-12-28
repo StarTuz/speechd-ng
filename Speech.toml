@@ -1,0 +1,6 @@
+ollama_url = "http://localhost:11434"
+ollama_model = "llama3"
+piper_model = "en_US-lessac-medium"
+tts_backend = "piper"
+memory_size = 50
+enable_audio = true

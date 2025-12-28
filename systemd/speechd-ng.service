@@ -5,7 +5,7 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/home/startux/Code/speechserverdaemon/target/debug/speechserverdaemon
+ExecStart=/home/startux/.local/bin/speechserverdaemon
 Restart=on-failure
 BusName=org.speech.Service
 Environment=RUST_LOG=info
@@ -18,7 +18,8 @@ Environment=RUST_LOG=info
 ProtectSystem=strict
 ProtectHome=read-only
 PrivateTmp=true
-ReadWritePaths=
+# Allow writing to Piper models directory
+ReadWritePaths=%h/.local/share/piper/models
 
 # Prevent privilege escalation
 NoNewPrivileges=true
@@ -36,15 +37,17 @@ ProtectHostname=true
 # Restrict device access (audio still works via PipeWire/PulseAudio socket)
 PrivateDevices=true
 
-# Network: Allow only localhost (for Ollama connection)
+# Network: Allow localhost (Ollama) and Hugging Face (Piper downloads)
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 IPAddressAllow=localhost
+IPAddressAllow=huggingface.co
+IPAddressAllow=cdn-lfs.huggingface.co
 IPAddressDeny=any
 
 # Restrict system calls to common set
 SystemCallArchitectures=native
-SystemCallFilter=@system-service
-SystemCallFilter=~@privileged @resources
+SystemCallFilter=@system-service clone3 rseq arch_prctl
+SystemCallFilter=~@privileged
 
 # Memory protection
 MemoryDenyWriteExecute=true

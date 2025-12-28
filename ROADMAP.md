@@ -30,15 +30,22 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **Systemd Sandboxing**: 20+ security directives applied to service file.
 -   [x] **LLM Prompt Sanitization**: User input filtered to prevent injection attacks.
 
-## Phase 5: Plug-in & Voice System (✅ Completed)
-**Goal**: Extensibility.
--   [x] **Backend Trait**: Abstract `espeak-ng` so we can plugin `Piper`, `Coqui`, etc.
--   [x] **Safety Timeouts**: Backends are killed if they hang (>5s).
--   [x] **Voice Enumeration**: D-Bus API to list available voices (`ListVoices`).
--   [x] **Voice Selection**: `SpeakVoice()` method to speak with a specific voice ID.
+## Phase 5: Plug-in & Premium Voice System (✅ Completed)
+**Goal**: Extensibility & High Quality.
+-   [x] **Piper TTS Integration**: Neural, human-like local voices.
+-   [x] **Intelligent Backend Mixer**: Simultaneous support for eSpeak & Piper.
+-   [x] **Rich Metadata Discovery**: Extraction of language/quality/gender from model configs.
+-   [x] **Zero-Config Downloader**: Securely fetch neural models from Hugging Face via D-Bus.
+-   [x] **Backend Trait**: Abstract backends for generic engine support.
 
 ## Phase 6: Input & Accessibility (✅ Completed)
 **Goal**: Two-way interaction (The "Ears").
 -   [x] **Microphone Stream**: Secure access to mic via `cpal`.
 -   [x] **Speech-to-Text (STT)**: Integration with Whisper (CLI) and Vosk (CLI).
 -   [x] **Orca Compatibility**: Shim to pretend to be `speech-dispatcher` for legacy app support.
+
+## Phase 7: Hands-Free Interaction (✅ Completed)
+**Goal**: Semi-Autonomous Operation.
+-   [x] **Wake Word Detection**: Low-power standby observing for "StarTuz" via Vosk.
+-   [x] **Voice Commands**: Trigger actions via speech (e.g., "Summarize the last 10 minutes").
+-   [x] **Command Loop**: Seamless transition from standby to active listening and back.

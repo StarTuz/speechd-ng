@@ -13,7 +13,7 @@ We have completed **Phase 14 (Partial)** of the roadmap. **SpeechD-NG** is now a
 | 1-11 | Core, AI, Training, Ignored Commands | ✅ |
 | 12 | Improved VAD (Voice Activity Detection) | ✅ |
 | 13 | Wyoming Protocol (Remote ASR) | ✅ |
-| 14 | Hardening & Packaging | 🚧 In Progress |
+| 14 | Hardening & Packaging | ✅ |
 
 ## Functional Features
 

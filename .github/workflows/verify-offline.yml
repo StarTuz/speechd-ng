@@ -60,9 +60,23 @@ jobs:
           ./target/release/speechserverdaemon > daemon.log 2>&1 &
           DAEMON_PID=$!
           echo "Daemon started with PID: $DAEMON_PID"
-          sleep 10 # Give it more time for local model checks etc.
+          
+          # 2. Wait for service to appear on bus (up to 30s)
+          echo "Waiting for org.speech.Service to appear on bus..."
+          for i in {1..30}; do
+            if busctl status org.speech.Service >/dev/null 2>&1; then
+               echo "Service is UP after $i seconds."
+               break
+            fi
+            if ! kill -0 $DAEMON_PID 2>/dev/null; then
+               echo "::error::Daemon died during startup!"
+               cat daemon.log
+               exit 1
+            fi
+            sleep 1
+          done
 
-          # 2. Run Benchmark/Check
+          # 3. Run Benchmark/Check
           echo "Running Client Check..."
           python3 benchmarks/latency_test.py
           CLIENT_EXIT=$?
@@ -75,7 +89,7 @@ jobs:
             exit 1
           fi
 
-          # 3. Verify Daemon is still alive
+          # 4. Verify Daemon is still alive
           if ! kill -0 $DAEMON_PID; then
             echo "::error::Daemon crashed during execution"
             echo "--- Daemon Logs ---"
@@ -85,7 +99,4 @@ jobs:
 
           echo "Offline resilience verified."
           kill $DAEMON_PID
-          
-          # Optional: show logs on success if we want visibility
-          # cat daemon.log 
         '

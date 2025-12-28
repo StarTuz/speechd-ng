@@ -29,6 +29,7 @@ The system is composed of three main layers:
 -   `espeak-ng` (Runtime dependency for synthesis)
 -   `libdbus-1-dev` (Usually pre-installed)
 -   `openai-whisper` (Optional, for Speech-to-Text)
+-   `vosk` (Optional, alternative Low-Latency STT)
 -   `Ollama` (Optional, for "Brain" features)
 
 ### Build

@@ -40,5 +40,5 @@ This document outlines the strategic phases for SpeechD-NG development.
 ## Phase 6: Input & Accessibility (✅ Completed)
 **Goal**: Two-way interaction (The "Ears").
 -   [x] **Microphone Stream**: Secure access to mic via `cpal`.
--   [x] **Speech-to-Text (STT)**: Integration with Whisper (CLI).
+-   [x] **Speech-to-Text (STT)**: Integration with Whisper (CLI) and Vosk (CLI).
 -   [x] **Orca Compatibility**: Shim to pretend to be `speech-dispatcher` for legacy app support.

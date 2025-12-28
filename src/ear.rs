@@ -98,12 +98,27 @@ impl Ear {
     }
 
     fn transcribe(&self, path: &str) -> Result<String, String> {
-        // Try standard 'whisper' command (OpenAI Python or cpp)
-        // We assume 'whisper <file> --output_format txt --output_dir /tmp' 
-        // Or 'whisper <file> --model tiny --language en'
-        
-        // Simple check if whisper exists
-        let output = Command::new("whisper")
+        let txt_path = path.replace(".wav", ".txt");
+
+        // PRIORITY 1: Vosk (Low Latency / Offline)
+        // Command: vosk-transcriber -i <wav> -o <txt>
+        let vosk_check = Command::new("vosk-transcriber")
+            .arg("-i")
+            .arg(path)
+            .arg("-o")
+            .arg(&txt_path)
+            .output();
+
+        if let Ok(out) = vosk_check {
+            if out.status.success() {
+                return std::fs::read_to_string(&txt_path)
+                    .map_err(|e| format!("Vosk success but read error: {}", e));
+            }
+        }
+
+        // PRIORITY 2: Whisper (High Accuracy)
+        // Command: whisper <wav> --output_format txt --output_dir /tmp
+        let whisper_check = Command::new("whisper")
             .arg(path)
             .arg("--model")
             .arg("tiny")
@@ -113,24 +128,19 @@ impl Ear {
             .arg("/tmp")
             .output();
 
-        match output {
+        match whisper_check {
             Ok(out) => {
                 if out.status.success() {
-                    // Read the output file
-                    // Whisper typically creates /tmp/recorded_speech.txt
-                    let txt_path = path.replace(".wav", ".txt");
-                    std::fs::read_to_string(&txt_path)
-                        .map_err(|e| format!("Could not read transcript: {}", e))
+                    let whisper_txt_path = path.replace(".wav", ".txt");
+                    std::fs::read_to_string(&whisper_txt_path)
+                        .map_err(|e| format!("Whisper success but read error: {}", e))
                 } else {
                     let err = String::from_utf8_lossy(&out.stderr);
-                    Err(format!("Whisper failed: {}", err))
+                    Err(format!("STT Failed. Vosk not found/failed. Whisper failed: {}", err))
                 }
             },
             Err(_) => {
-                // Try 'main' (whisper.cpp)
-                // main -f <file> -m <model> -otxt
-                // This is too specific. Just fail gracefully.
-                Err("STT Engine 'whisper' not found in PATH. Please install openai-whisper.".to_string())
+                Err("No STT engine found. Please install 'vosk' (pip install vosk) or 'openai-whisper'.".to_string())
             }
         }
     }

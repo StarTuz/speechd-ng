@@ -3,7 +3,7 @@ use crate::backends::espeak::EspeakBackend;
 use crate::backends::piper::PiperBackend;
 use crate::backends::Voice;
 use std::io::Cursor;
-use rodio::{Decoder, OutputStream, Sink};
+use rodio::{Decoder, OutputStream, Sink, OutputStreamHandle};
 use std::thread;
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Sender as MpscSender};
@@ -32,7 +32,20 @@ impl AudioEngine {
         
         thread::spawn(move || {
             // Audio stream must live on this thread
-            let (_stream, stream_handle) = OutputStream::try_default().expect("No audio output device found");
+            let audio_resource = OutputStream::try_default();
+            
+            let _stream_ownership;
+            let stream_handle: Option<OutputStreamHandle> = match audio_resource {
+                Ok((s, h)) => {
+                    _stream_ownership = Some(s);
+                    Some(h)
+                }
+                Err(e) => {
+                    eprintln!("Audio Thread: No audio output device found: {}. Headless mode active.", e);
+                    _stream_ownership = None;
+                    None
+                }
+            };
             
             while let Ok(msg) = rx.recv() {
                 match msg {
@@ -81,21 +94,25 @@ impl AudioEngine {
                             match backend.synthesize(&text, voice_id) {
                                 Ok(audio_data) => {
                                     println!("Audio Thread: Received {} bytes of audio data", audio_data.len());
-                                    let cursor = Cursor::new(audio_data);
-                                    match Sink::try_new(&stream_handle) {
-                                        Ok(sink) => {
-                                            match Decoder::new(cursor) {
-                                                Ok(source) => {
-                                                    use rodio::Source;
-                                                    println!("Audio Thread: Playing audio...");
-                                                    sink.append(source.convert_samples::<f32>());
-                                                    sink.sleep_until_end();
-                                                    println!("Audio Thread: Playback complete");
+                                    if let Some(ref handle) = stream_handle {
+                                        let cursor = Cursor::new(audio_data);
+                                        match Sink::try_new(handle) {
+                                            Ok(sink) => {
+                                                match Decoder::new(cursor) {
+                                                    Ok(source) => {
+                                                        use rodio::Source;
+                                                        println!("Audio Thread: Playing audio...");
+                                                        sink.append(source.convert_samples::<f32>());
+                                                        sink.sleep_until_end();
+                                                        println!("Audio Thread: Playback complete");
+                                                    }
+                                                    Err(e) => eprintln!("Failed to decode: {}", e),
                                                 }
-                                                Err(e) => eprintln!("Failed to decode: {}", e),
                                             }
+                                            Err(e) => eprintln!("Failed to create sink: {}", e),
                                         }
-                                        Err(e) => eprintln!("Failed to create sink: {}", e),
+                                    } else {
+                                        println!("Audio Thread (Headless): Skipping playback of synthesized audio.");
                                     }
                                 }
                                 Err(e) => eprintln!("Backend {} error: {}", target_backend_id, e),

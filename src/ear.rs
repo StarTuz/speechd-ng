@@ -64,7 +64,7 @@ impl Ear {
                 let host = cpal::default_host();
                 println!("Ear: Host acquired.");
                 
-                let device = {
+                let device_resource = {
                     let mut selected = None;
                     if let Ok(devices) = host.input_devices() {
                         for d in devices {
@@ -87,7 +87,15 @@ impl Ear {
                             }
                         }
                     }
-                    selected.or_else(|| host.default_input_device()).expect("No input device")
+                    selected.or_else(|| host.default_input_device())
+                };
+
+                let device = if let Some(d) = device_resource {
+                    d
+                } else {
+                    eprintln!("Ear: No input device found. Standing by (will retry in 30s)...");
+                    thread::sleep(Duration::from_secs(30));
+                    continue;
                 };
 
                 println!("Ear: Device acquired: {:?}, Backend: {:?}", device.name().ok(), host.id());

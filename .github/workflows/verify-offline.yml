@@ -20,7 +20,7 @@ jobs:
     - name: Install System Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libasound2-dev libdbus-1-dev pkg-config libsystemd-dev dbus
+        sudo apt-get install -y libasound2-dev libdbus-1-dev pkg-config libsystemd-dev dbus python3-dbus alsa-utils
 
     - name: Install Rust
       uses: actions-rs/toolchain@v1
@@ -56,30 +56,36 @@ jobs:
       run: |
         # Wrap everything in dbus-run-session so we have a bus
         dbus-run-session -- bash -c '
-          # 1. Start Daemon
-          ./target/release/speechserverdaemon &
+          # 1. Start Daemon with output captured
+          ./target/release/speechserverdaemon > daemon.log 2>&1 &
           DAEMON_PID=$!
-          echo "Daemon PID: $DAEMON_PID"
-          sleep 5 # Give it time to start
+          echo "Daemon started with PID: $DAEMON_PID"
+          sleep 10 # Give it more time for local model checks etc.
 
           # 2. Run Benchmark/Check
-          # It should connect (Ping), Speak (OK), and Think (Fail gracefully)
           echo "Running Client Check..."
           python3 benchmarks/latency_test.py
           CLIENT_EXIT=$?
 
           if [ $CLIENT_EXIT -ne 0 ]; then
-            echo "Client failed!"
+            echo "::error::Client test failed with exit code $CLIENT_EXIT"
+            echo "--- Daemon Logs ---"
+            cat daemon.log
             kill $DAEMON_PID
             exit 1
           fi
 
           # 3. Verify Daemon is still alive
           if ! kill -0 $DAEMON_PID; then
-            echo "Daemon crashed!"
+            echo "::error::Daemon crashed during execution"
+            echo "--- Daemon Logs ---"
+            cat daemon.log
             exit 1
           fi
 
           echo "Offline resilience verified."
           kill $DAEMON_PID
+          
+          # Optional: show logs on success if we want visibility
+          # cat daemon.log 
         '

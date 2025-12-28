@@ -32,6 +32,18 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Pin
 
 ---
 
+### `GetVersion() → String` (Phase 14)
+
+Get the daemon version string.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service GetVersion
+```
+
+**Returns:** Version string (e.g., `"0.2.0"`)
+
+---
+
 ## Core TTS Methods
 
 ### `Speak(text: String)`

@@ -2,7 +2,7 @@
 
 ## Current Context
 
-We have completed **Phase 14** of the roadmap. **SpeechD-NG** is now a fully-featured, self-improving, hands-free speech assistant that is **production-hardened and package-ready**.
+We have completed **Phase 14** of the roadmap. **SpeechD-NG v0.2.0** is now a fully-featured, self-improving, hands-free speech assistant that is **production-hardened and package-ready**.
 
 ## Status: All Phases Completed (1-14)
 
@@ -39,13 +39,15 @@ We have completed **Phase 14** of the roadmap. **SpeechD-NG** is now a fully-fea
 
 ## D-Bus API Summary
 
-**Diagnostics & Safety (Phase 14):**
+**Diagnostics & Version (Phase 14):**
 - `Ping()` - Diagnostic connectivity check (returns "pong")
+- `GetVersion()` - Get daemon version (returns "0.2.0")
 - `RollbackLastCorrection()` - Undo the last learning event
 
 **Configuration (Phase 13):**
 - `GetSttBackend()` - Get current backend (vosk/wyoming)
 - `GetWyomingInfo()` - Get host/port/model info
+- `GetStatus()` - Get diagnostic summary (ai_enabled, threshold, backend, patterns)
 
 ### Service Details
 | Property | Value |
@@ -104,12 +106,19 @@ wake_word = "mango"
 enable_wake_word = false
 ```
 
-1.  **Packaging**: `.deb`, `.rpm`, and `Flatpak` manifests created.
-2.  **Benchmarking**: Latency suite implemented in `benchmarks/`.
-3.  **CI Hardening**: Robust offline-mode verification suite with D-Bus stability pass.
+## Packaging
+
+Pre-built packages available in `dist/`:
+
+| Package | Format | For |
+|---------|--------|-----|
+| `speechserverdaemon_0.2.0-1_amd64.deb` | Debian | Ubuntu, Debian, Mint |
+| `speechserverdaemon-0.2.0-1.x86_64.rpm` | RPM | Fedora, openSUSE, RHEL |
+| `org.speech.Service-0.2.0.flatpak` | Flatpak | Universal Linux |
 
 ## Repository
 
 -   **GitHub**: https://github.com/StarTuz/speechd-ng
 -   **Branch**: `main`
+-   **Release**: v0.2.0
 -   **Last Updated**: 2025-12-28

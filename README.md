@@ -117,7 +117,7 @@ See **[docs/API_REFERENCE.md](docs/API_REFERENCE.md)** for the complete D-Bus AP
 
 | Category | Methods |
 |----------|---------|
-| **Core** | `Ping`, `GetStatus` |
+| **Core** | `Ping`, `GetVersion`, `GetStatus` |
 | **TTS** | `Speak`, `SpeakVoice`, `ListVoices`, `ListDownloadableVoices`, `DownloadVoice` |
 | **AI** | `Think`, `Listen` |
 | **Training** | `AddCorrection`, `TrainWord`, `ListPatterns`, `GetFingerprintStats` |

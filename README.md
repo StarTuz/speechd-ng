@@ -1,89 +1,200 @@
 # SpeechD-NG: The Next-Generation Linux Speech Daemon
 
-**SpeechD-NG** is a modern, secure, and intelligent speech service designed for the Linux ecosystem. It aims to replace the aging `speech-dispatcher` with a window-manager agnostic, high-performance, and "AI-ready" architecture.
+**SpeechD-NG** is a modern, secure, and intelligent speech service designed for the Linux ecosystem. It replaces the aging `speech-dispatcher` with a window-manager agnostic, high-performance, and AI-ready architecture.
 
 ## 🚀 Mission
+
 1.  **Window Manager Agnostic**: Works flawlessly on GNOME, KDE, Sway, Hyprland, and raw TTYs.
-2.  **Service-Based**: Runs as a standard `systemd` service (User or System).
+2.  **Service-Based**: Runs as a standard `systemd` user service.
 3.  **Secure by Design**: Uses D-Bus for IPC with strict isolation and Polkit authorization.
-4.  **AI-Ready**: Built to integrate with local LLMs (like Ollama) for passive/active learning.
-5.  **Neural First**: First-class support for high-quality Piper neural voices with automated model downloading.
+4.  **AI-Ready**: Built to integrate with local LLMs (like Ollama) for contextual understanding.
+5.  **Neural First**: First-class support for high-quality Piper neural voices.
 6.  **Autonomous**: Integrated wake word detection for hands-free interaction.
-7.  **Self-Improving**: Passive and active voice learning to correct transcription errors over time.
+7.  **Self-Improving**: Passive and manual voice learning to correct transcription errors over time.
 
 ## 🏗 Architecture
 
-1.  **The Daemon (Core)**: Rust + `zbus`. Extremely lightweight router.
-2.  **The Audio Engine**: Multi-backend mixer supporting `eSpeak-ng` and `Piper`.
-3.  **The Ear**: Native audio capture with offline STT (Vosk/Whisper) and Wake Word detection.
-4.  **The Cortex**: Async Ollama connector for context-aware "thinking" and summaries.
-5.  **The Fingerprint**: Local learning engine that tracks voice patterns and corrects STT errors.
+| Component | Description |
+|-----------|-------------|
+| **The Daemon** | Rust + `zbus`. Lightweight D-Bus router. |
+| **Audio Engine** | Multi-backend mixer (eSpeak-ng + Piper). |
+| **The Ear** | Audio capture with offline STT (Vosk/Whisper). |
+| **The Cortex** | Async Ollama connector for AI "thinking". |
+| **The Fingerprint** | Voice learning engine for STT error correction. |
 
 ## 🛠 Building & Installation
 
 ### Prerequisites
--   Rust (Stable)
--   `espeak-ng` (Runtime for fast synthesis)
--   `piper` (High-quality neural synthesis)
--   `vosk` (Python package for wake word and STT)
--   `Ollama` (Optional, for "Brain" features)
+
+| Package | Purpose |
+|---------|---------|
+| Rust (Stable) | Build the daemon |
+| `espeak-ng` | Fast synthesis fallback |
+| `piper` | High-quality neural synthesis |
+| `vosk` (pip) | Wake word and STT |
+| `Ollama` | AI brain (optional) |
 
 ### Build
+
 ```bash
 cargo build --release
 ```
 
-### Installation (User Service)
-1.  Copy the binary:
-    ```bash
-    cp target/release/speechserverdaemon ~/.local/bin/
-    ```
-2.  Install Systemd Unit:
-    ```bash
-    cp systemd/speechd-ng.service ~/.config/systemd/user/
-    systemctl --user daemon-reload
-    systemctl --user enable --now speechd-ng
-    ```
+### Installation
 
-### Configuration
-Create `~/.config/speechd-ng/Speech.toml` with any of these options:
-```toml
-ollama_url = "http://localhost:11434"   # LLM endpoint
-ollama_model = "llama3"                 # LLM model name
-piper_model = "en_US-lessac-medium"     # Default Piper voice
-piper_binary = "piper"                  # Path to piper binary (or just name for PATH lookup)
-tts_backend = "piper"                   # Default backend: "piper" or "espeak"
-memory_size = 50                        # Context memory size
-enable_audio = true                     # Audio output toggle
-wake_word = "startuz"                   # Wake word phrase
-enable_wake_word = false                # Enable hands-free mode
+```bash
+# Copy binary
+cp target/release/speechserverdaemon ~/.local/bin/
+
+# Install systemd service
+cp systemd/speechd-ng.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now speechd-ng
 ```
 
-## 📡 API Usage (D-Bus)
+### Configuration
 
-### Example: Command Line
+Create `~/.config/speechd-ng/Speech.toml`:
+
+```toml
+# LLM Settings
+ollama_url = "http://localhost:11434"
+ollama_model = "llama3"
+
+# TTS Settings
+piper_model = "en_US-lessac-medium"
+piper_binary = "piper"              # Or full path: /path/to/piper
+tts_backend = "piper"               # "piper" or "espeak"
+
+# Memory & Audio
+memory_size = 50
+enable_audio = true
+
+# Wake Word (Hands-Free Mode)
+wake_word = "mango"
+enable_wake_word = false
+```
+
+## 📡 Quick Start
+
 ```bash
-# Speak (Premium Neural Voice)
+# Speak something
 busctl --user call org.speech.Service /org/speech/Service org.speech.Service Speak s "Hello world"
 
-# List All Remote Neural Voices
-busctl --user call org.speech.Service /org/speech/Service org.speech.Service ListDownloadableVoices
+# List available voices
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service ListVoices
 
-# Download a Neural Voice
-busctl --user call org.speech.Service /org/speech/Service org.speech.Service DownloadVoice s "piper:en_US-amy-low"
+# Ask the AI about recent speech
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service Think s "Summarize what was said"
 
-# Hands-Free Interaction
-# Simply say "StarTuz" (or your configured wake word)
-# The daemon will respond "Yes?" and record your next 4 seconds of speech.
+# Add a voice correction
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service AddCorrection ss "mozurt" "mozart"
+
+# View all learned patterns
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service ListPatterns
+```
+
+## 📖 Full API Documentation
+
+See **[docs/API_REFERENCE.md](docs/API_REFERENCE.md)** for the complete D-Bus API reference including:
+
+- All methods with parameters and return types
+- Python integration examples
+- Rust integration examples
+- Error handling guidelines
+
+### Method Summary
+
+| Category | Methods |
+|----------|---------|
+| **TTS** | `Speak`, `SpeakVoice`, `ListVoices`, `ListDownloadableVoices`, `DownloadVoice` |
+| **AI** | `Think`, `Listen` |
+| **Training** | `AddCorrection`, `TrainWord`, `ListPatterns`, `GetFingerprintStats` |
+| **Import/Export** | `ExportFingerprint`, `ImportFingerprint`, `GetFingerprintPath` |
+| **Ignored** | `GetIgnoredCommands`, `CorrectIgnoredCommand`, `ClearIgnoredCommands` |
+
+## 🎤 Wake Word Mode
+
+When enabled, the daemon listens for a wake word and responds:
+
+1. Say "**Mango**" (or your configured wake word)
+2. Daemon responds: "Yes?"
+3. Speak your command (4 second window)
+4. AI processes and responds via TTS
+
+Enable in config:
+```toml
+wake_word = "mango"
+enable_wake_word = true
+```
+
+## 🧠 Voice Learning
+
+SpeechD-NG learns from your voice to improve accuracy:
+
+### Passive Learning
+When the LLM corrects an ASR error, the system automatically learns the pattern.
+
+### Manual Training
+Explicitly teach the system words it mishears:
+
+```bash
+# Direct correction (you know what ASR gets wrong)
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service AddCorrection ss "mozurt" "mozart"
+
+# Interactive training (record and learn)
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service TrainWord su "beethoven" 3
+```
+
+### Pattern Management
+
+```bash
+# View all patterns
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service ListPatterns
+
+# Export for backup/sharing
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service ExportFingerprint s "$HOME/Documents/voice_patterns.json"
+
+# Import from another system
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service ImportFingerprint sb "/path/to/patterns.json" true
 ```
 
 ## 🗺 Roadmap
 
--   **Phase 1: Foundation** (✅ Core D-Bus)
--   **Phase 2: Audio Engine** (✅ rodio + eSpeak)
--   **Phase 3: The Cortex** (✅ Ollama + History)
--   **Phase 4: Security** (✅ Polkit + Systemd Sandboxing)
--   **Phase 5: Premium Voices** (✅ Piper + Zero-Config Downloader)
--   **Phase 6: Accessibility** (✅ STT + SSIP/Orca Shim)
--   **Phase 7: Autonomous** (✅ Wake Word + Command Loop)
--   **Phase 8: Voice Learning** (✅ Personalized Fingerprinting)
+| Phase | Feature | Status |
+|-------|---------|--------|
+| 1 | Foundation (D-Bus + Systemd) | ✅ Complete |
+| 2 | Audio Engine (rodio + eSpeak) | ✅ Complete |
+| 3 | The Cortex (Ollama + History) | ✅ Complete |
+| 4 | Security (Polkit + Sandbox) | ✅ Complete |
+| 5 | Premium Voices (Piper) | ✅ Complete |
+| 6 | Accessibility (STT + SSIP) | ✅ Complete |
+| 7 | Autonomous (Wake Word) | ✅ Complete |
+| 8 | Passive Learning | ✅ Complete |
+| 9 | Manual Training API | ✅ Complete |
+| 10 | Pattern Import/Export | ✅ Complete |
+| 11 | Ignored Commands | ✅ Complete |
+| 12 | Improved VAD | 📋 Planned |
+| 13 | Wyoming Protocol | 📋 Future |
+
+## 🔒 Security
+
+- **Systemd Sandboxing**: 20+ security directives
+- **Polkit Integration**: Permission checks on sensitive operations
+- **Read-Only Home**: Writes only to specific directories
+- **No Network Abuse**: Restricted to localhost and Hugging Face
+
+## 📝 License
+
+MIT License - See [LICENSE](LICENSE) for details.
+
+## 🤝 Contributing
+
+Contributions welcome! Please see:
+- [ROADMAP.md](ROADMAP.md) - Development phases
+- [docs/API_REFERENCE.md](docs/API_REFERENCE.md) - API documentation
+- [HANDOFF.md](HANDOFF.md) - Current status and quick reference
+
+---
+
+*SpeechD-NG: Speak freely.*

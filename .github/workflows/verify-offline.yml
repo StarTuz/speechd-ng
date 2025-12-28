@@ -35,15 +35,14 @@ jobs:
     - name: Setup Dummy Config (Broken Network)
       run: |
         mkdir -p ~/.config/speechd-ng
-        # Point Ollama to unreachable IP to simulate timeout/offline
-        # Enable AI to force the code path to try connecting
-        cat <<EOF > ~/.config/speechd-ng/Speech.toml
-        ollama_url = "http://192.0.2.1:12345" 
+        # Use sed to strip leading spaces from the heredoc to ensure clean TOML
+        sed 's/^        //' <<EOF > ~/.config/speechd-ng/Speech.toml
+        ollama_url = "http://192.0.2.1:12345"
         ollama_model = "void"
         enable_ai = true
         passive_confidence_threshold = 0.1
         piper_model = "en_US-lessac-medium"
-        tts_backend = "espeak" 
+        tts_backend = "espeak"
         enable_audio = false
         EOF
 

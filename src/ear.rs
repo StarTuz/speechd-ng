@@ -4,7 +4,6 @@ use std::thread;
 use std::time::Duration;
 use std::process::{Command, Stdio};
 use std::io::{Write, BufRead, BufReader};
-use wait_timeout::ChildExt;
 use crate::engine::AudioEngine;
 use crate::cortex::Cortex;
 

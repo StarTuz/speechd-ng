@@ -1,8 +1,6 @@
 use super::{SpeechBackend, Voice};
 use std::io::{Result, Error, ErrorKind};
 use std::process::{Stdio, Command};
-use wait_timeout::ChildExt;
-use std::time::Duration;
 use std::path::{Path, PathBuf};
 use serde_json::Value;
 

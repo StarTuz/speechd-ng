@@ -3,48 +3,45 @@
 ## Current Context
 We are building **SpeechD-NG**, a modern replacement for Linux command-line/desktop speech services. The project is written in **Rust** to ensure memory safety, speed, and concurrency.
 
-## Status: Phase 4 Completed (Security & Configuration)
-We have implemented all core functionality through Phase 4.
+## Status: Phase 5 Partial (Plug-ins & Security)
+We have established the **Plugin Architecture** and reinforced security.
 
 ### 1. Functional Features
--   **D-Bus Service**: Claims `org.speech.Service` on the user session bus.
--   **Async Core**: Uses `tokio` and `zbus` for non-blocking I/O.
--   **Audio Pipeline**: Dedicated thread handles `espeak-ng` + `rodio` playback.
--   **The Cortex**: Async module for speech memory and Ollama integration.
--   **Security Hooks**: `SecurityAgent` validates sender on sensitive methods.
--   **Configuration**: Dynamic settings via `Speech.toml`, environment vars, or defaults.
+-   **D-Bus Service**: Claims `org.speech.Service`.
+-   **Audio Pipeline**: Threaded audio engine with **Process Timeouts**.
+-   **The Cortex**: Aware of speech history and connected to Ollama.
+-   **Security**:
+    -   **Systemd Sandbox**: Strict file/network/capability restrictions.
+    -   **LLM Sanitization**: Hardened prompts.
+    -   **Backend Safety**: 5-second timeout on speech synthesis processes.
 
-### 2. Key Technical Decisions
--   **Rodio v0.17.3**: Pinned for API stability.
--   **Dual-Actor Architecture**: 
-    -   `AudioEngine` (Sync Thread): Blocking audio operations.
-    -   `Cortex` (Async Task): HTTP/Ollama and state management.
-    -   `SpeechService` (Main): D-Bus dispatch to both actors.
--   **Systemd Sandboxing**: 20+ security directives applied.
+### 2. Architecture: Pluggable Backends
+-   **`SpeechBackend` Trait**: Located in `src/backends/mod.rs`. Allows easy addition of new TTS engines.
+-   **Current Backends**:
+    -   `EspeakBackend`: Wraps `espeak-ng` binary. Includes timeout logic using `wait-timeout` crate.
+-   **Isolation**: Backends run in the Audio Thread, decoupled from the main D-Bus loop.
 
 ## File Structure
 ```
 src/
-├── main.rs          # Entry point, D-Bus interface
-├── engine.rs        # Audio synthesis actor
-├── cortex.rs        # Intelligence & Memory actor
-├── security.rs      # Permission validation (Polkit stub)
-└── config_loader.rs # Dynamic configuration
-systemd/
-├── speechd-ng.service         # Hardened systemd unit
-└── org.speech.Service.service # D-Bus activation file
+├── main.rs          # D-Bus & Cortex/Engine orchestration
+├── engine.rs        # Audio Thread (Consumer of Backends)
+├── cortex.rs        # Memory & AI
+├── security.rs      # Polkit Stubs
+├── config_loader.rs # Settings
+└── backends/        # TTS Plugins
+    ├── mod.rs       # Trait definition
+    └── espeak.rs    # Espeak implementation
 ```
 
-## Immediate Next Steps (Phase 5)
-The next milestone is **Plug-in & Voice System**.
-
-1.  **Backend Trait**: Abstract the TTS engine so `espeak-ng`, `Piper`, `Coqui`, etc. can be swapped.
-2.  **Voice Enumeration**: D-Bus method to list available voices.
-3.  **Voice Selection**: Allow callers to specify voice in `Speak()`.
+## Immediate Next Steps (Phase 5 Completion)
+1.  **Voice Enumeration**: Add `ListVoices()` to the D-Bus API.
+2.  **Voice Selection**: Update `Speak()` to accept a voice ID.
+3.  **Piper Backend**: Implement `SpeechBackend` for the high-quality Piper TTS.
 
 ## Known Limitations
--   **Polkit**: Security hook logs but does not yet enforce denial (stub implementation).
--   **LLM Sanitization**: User prompts are not sanitized before sending to Ollama.
+-   **Polkit**: Not yet blocking unprivileged calls (Hook exists).
+-   **Voice Config**: Hardcoded to default voice in backend.
 
 ## Repository
 -   **GitHub**: https://github.com/StarTuz/speechd-ng

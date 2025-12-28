@@ -30,10 +30,12 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **Systemd Sandboxing**: 20+ security directives applied to service file.
 -   [x] **LLM Prompt Sanitization**: User input filtered to prevent injection attacks.
 
-## Phase 5: Plug-in & Voice System (🚧 Next Up)
+## Phase 5: Plug-in & Voice System (✅ Partial Completion)
 **Goal**: Extensibility.
--   [ ] **Backend Trait**: Abstract `espeak-ng` so we can plugin `Piper`, `Coqui`, etc.
+-   [x] **Backend Trait**: Abstract `espeak-ng` so we can plugin `Piper`, `Coqui`, etc.
+-   [x] **Safety Timeouts**: Backends are killed if they hang (>5s).
 -   [ ] **Voice Enumeration**: D-Bus API to list available voices.
+-   [ ] **Voice Selection**: Allow callers to specify voice in `Speak()`.
 
 ## Phase 6: Input & Accessibility
 **Goal**: Two-way interaction.

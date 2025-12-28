@@ -2,6 +2,7 @@ mod engine;
 mod cortex;
 mod config_loader;
 mod security;
+mod backends;
 use engine::AudioEngine;
 use cortex::Cortex;
 use security::SecurityAgent;

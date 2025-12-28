@@ -98,3 +98,10 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **Wyoming Client**: Stream audio to wyoming-whisper servers via `wyoming_bridge.py`.
 -   [x] **Configurable Backend**: Switch between `vosk` and `wyoming` in config.
 -   [x] **D-Bus Info API**: Get current backend info and status.
+
+## Phase 14: Hardening & Packaging (📋 Planned)
+**Goal**: Production readiness and distribution.
+-   [ ] **Packaging**: Create `.deb`, `.rpm`, and `Flatpak` manifests.
+-   [ ] **Safety**: Implement `RollbackLastCorrection` to undo bad learning.
+-   [ ] **Benchmarking**: Create latency/resource usage test suite.
+-   [ ] **CI Hardening**: Add offline-mode verification tests.

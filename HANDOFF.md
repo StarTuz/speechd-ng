@@ -3,44 +3,33 @@
 ## Current Context
 We are building **SpeechD-NG**, a modern replacement for Linux command-line/desktop speech services. The project is written in **Rust** to ensure memory safety, speed, and concurrency.
 
-## Status: Phase 5 Completed (Plug-ins & Voice System)
-We have implemented a fully extensible Voice System with Security Hardening.
+## Status: Phase 6 In Progress (Input & Accessibility)
+We have implemented Microphone access and STT wiring.
 
 ### 1. Functional Features
--   **Audio Pipeline**: 
-    -   Threaded audio engine with **Process Timeouts** (5s).
-    -   Parses `espeak-ng` voices dynamically.
--   **D-Bus API**: 
-    -   `ListVoices()`: Returns `(VoiceID, Name)` pairs.
-    -   `SpeakVoice(text, voice_id)`: Speaks using the selected voice.
--   **Architecture**:
-    -   **Pluggable Backends**: Traits allow swapping TTS engines.
-    -   **EspeakBackend**: Fully implemented.
+-   **Audio Pipeline**: Threaded audio engine + `cpal` Microphone stream.
+-   **D-Bus API**: `Listen()` method records 3 seconds of audio and attempts transcription.
+-   **STT**: Wires up to `whisper` CLI (must be installed).
 
 ### 2. Architecture & Security
--   **Timeouts**: Synthesizer processes are killed if they hang, preventing DoS.
--   **Sandboxing**: Systemd strict confinement.
--   **LLM Safety**: Prompt injection filtering.
+-   **Audio**: `Ear` actor manages input stream. Offloaded to blocking thread.
+-   **Security**: `Listen` gated by `org.speech.service.listen`.
 
 ## File Structure
 ```
 src/
-├── main.rs          # D-Bus (Speak, SpeakVoice, ListVoices, Think)
-├── engine.rs        # Audio Actor (Voice Selection logic)
+├── main.rs          # D-Bus (Listen added)
+├── engine.rs        # Audio Output
+├── ear.rs           # Audio Input (Recording + Transcribe)
 ├── backends/        # TTS Plugins
-│   ├── mod.rs       # Trait definition + Voice struct
-│   └── espeak.rs    # Espeak implementation (parsing & synthesis)
 ```
 
-## Immediate Next Steps (Phase 6)
-The next milestone is **Input & Accessibility**.
-
-1.  **Microphone Access**: Integrating a secure audio recorder stream.
-2.  **Speech-to-Text**: Using Whisper (via `burn` or `whisper.cpp`) to transact audio->text.
-3.  **Orca Shim**: Mimicking `speech-dispatcher` to support legitimate screen reader clients.
+## Immediate Next Steps (Phase 6 Completion)
+1.  **Orca Shim**: Mimicking `speech-dispatcher`.
+2.  **Continuous Listening**: Wake word detection?
 
 ## Known Limitations
--   **Voice Config Persistence**: The daemon doesn't remember the "default" voice across restarts (must be passed in `SpeakVoice` or defaults to espeak default).
+-   **STT**: Requires external `whisper` binary.
 
 ## Repository
 -   **GitHub**: https://github.com/StarTuz/speechd-ng

@@ -28,6 +28,7 @@ The system is composed of three main layers:
 -   Rust (Stable)
 -   `espeak-ng` (Runtime dependency for synthesis)
 -   `libdbus-1-dev` (Usually pre-installed)
+-   `openai-whisper` (Optional, for Speech-to-Text)
 -   `Ollama` (Optional, for "Brain" features)
 
 ### Build

@@ -2,6 +2,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
+use std::process::Command;
 
 pub struct Ear;
 
@@ -78,7 +79,7 @@ impl Ear {
             sample_format: hound::SampleFormat::Float,
         };
 
-        match hound::WavWriter::create(path, spec) {
+        let wav_msg = match hound::WavWriter::create(path, spec) {
             Ok(mut writer) => {
                 for &sample in captured_data.iter() {
                     let _ = writer.write_sample(sample);
@@ -87,6 +88,50 @@ impl Ear {
                 format!("Recorded {} samples to {}", captured_data.len(), path)
             },
             Err(e) => format!("Error saving WAV: {}", e)
+        };
+
+        // Attempt Transcription
+        match self.transcribe(path) {
+            Ok(text) => format!("{}\nTranscript: {}", wav_msg, text),
+            Err(e) => format!("{}\nSTT Error: {}", wav_msg, e),
+        }
+    }
+
+    fn transcribe(&self, path: &str) -> Result<String, String> {
+        // Try standard 'whisper' command (OpenAI Python or cpp)
+        // We assume 'whisper <file> --output_format txt --output_dir /tmp' 
+        // Or 'whisper <file> --model tiny --language en'
+        
+        // Simple check if whisper exists
+        let output = Command::new("whisper")
+            .arg(path)
+            .arg("--model")
+            .arg("tiny")
+            .arg("--output_format")
+            .arg("txt")
+            .arg("--output_dir")
+            .arg("/tmp")
+            .output();
+
+        match output {
+            Ok(out) => {
+                if out.status.success() {
+                    // Read the output file
+                    // Whisper typically creates /tmp/recorded_speech.txt
+                    let txt_path = path.replace(".wav", ".txt");
+                    std::fs::read_to_string(&txt_path)
+                        .map_err(|e| format!("Could not read transcript: {}", e))
+                } else {
+                    let err = String::from_utf8_lossy(&out.stderr);
+                    Err(format!("Whisper failed: {}", err))
+                }
+            },
+            Err(_) => {
+                // Try 'main' (whisper.cpp)
+                // main -f <file> -m <model> -otxt
+                // This is too specific. Just fail gracefully.
+                Err("STT Engine 'whisper' not found in PATH. Please install openai-whisper.".to_string())
+            }
         }
     }
 }

@@ -5,8 +5,11 @@ use std::sync::{Arc, Mutex};
 use reqwest::Client;
 use serde_json::json;
 
-// Maximum number of items to keep in short-term memory
-const MEMORY_SIZE: usize = 50;
+fn get_memory_size() -> usize {
+    crate::config_loader::SETTINGS.read()
+        .map(|s| s.memory_size)
+        .unwrap_or(50)
+}
 
 #[derive(Clone)]
 pub struct Cortex {
@@ -20,17 +23,20 @@ enum CortexMessage {
 
 struct Memory {
     history: VecDeque<String>,
+    max_size: usize,
 }
 
 impl Memory {
     fn new() -> Self {
+        let max_size = get_memory_size();
         Self {
-            history: VecDeque::with_capacity(MEMORY_SIZE),
+            history: VecDeque::with_capacity(max_size),
+            max_size,
         }
     }
 
     fn add(&mut self, text: String) {
-        if self.history.len() >= MEMORY_SIZE {
+        if self.history.len() >= self.max_size {
             self.history.pop_front();
         }
         self.history.push_back(text);
@@ -73,9 +79,14 @@ impl Cortex {
                         );
 
                         // Call Ollama
-                        let res = client.post("http://localhost:11434/api/generate")
+                        let (url, model) = {
+                            let settings = crate::config_loader::SETTINGS.read().unwrap();
+                            (settings.ollama_url.clone(), settings.ollama_model.clone())
+                        };
+
+                        let res = client.post(&format!("{}/api/generate", url))
                             .json(&json!({
-                                "model": "llama3", // TODO: Make configurable
+                                "model": model, 
                                 "prompt": full_prompt,
                                 "stream": false
                             }))

@@ -1,6 +1,7 @@
 [Unit]
 Description=Speech Server Daemon Next-Gen
-Documentation=https://github.com/intent/speech
+Documentation=https://github.com/StarTuz/speechd-ng
+After=graphical-session.target
 
 [Service]
 Type=simple
@@ -8,6 +9,51 @@ ExecStart=/home/startux/Code/speechserverdaemon/target/debug/speechserverdaemon
 Restart=on-failure
 BusName=org.speech.Service
 Environment=RUST_LOG=info
+
+# ========================
+# SECURITY HARDENING
+# ========================
+
+# Filesystem Protection
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths=
+
+# Prevent privilege escalation
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# Protect kernel and system configuration
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+
+# Restrict device access (audio still works via PipeWire/PulseAudio socket)
+PrivateDevices=true
+
+# Network: Allow only localhost (for Ollama connection)
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressAllow=localhost
+IPAddressDeny=any
+
+# Restrict system calls to common set
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+
+# Memory protection
+MemoryDenyWriteExecute=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+
+# Misc
+UMask=0077
 
 [Install]
 WantedBy=default.target

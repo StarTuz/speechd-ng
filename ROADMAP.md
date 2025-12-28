@@ -23,17 +23,16 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **Ollama Connector**: HTTP client to talk to `localhost:11434` for processing queries.
 -   [ ] **Reference Client**: A simple CLI tool (simulating a WM widget) to demonstrate "Asking the Daemon" about what was said.
 
-## Phase 4: Plug-in & Voice System
+## Phase 4: Security & Configuration (🚧 Next Up)
+**Goal**: Hardening and User Control.
+-   [ ] **Polkit Integration**: Gate the `Think` API behind `org.speech.service.think` policy.
+-   [ ] **Configuration**: Load `Speech.toml` for customizable settings (Ollama URL, Memory Size).
+-   [ ] **Socket Activation**: Ensure efficient startup.
+
+## Phase 5: Plug-in & Voice System
 **Goal**: Extensibility.
 -   [ ] **Backend Trait**: Abstract `espeak-ng` so we can plugin `Piper`, `Coqui`, etc.
 -   [ ] **Voice Enumeration**: D-Bus API to list available voices.
--   [ ] **Configuration**: `config.toml` for standard settings.
-
-## Phase 5: Security & Permissions
-**Goal**: Hardening for multi-user/untrusted environments.
--   [ ] **Polkit**: Require authorization for "listening" or "configuring".
--   [ ] **Socket Activation**: Ensure daemon only runs when needed (refine current setup).
--   [ ] **Namespace Isolation**: Use systemd sandboxing (`ProtectHome`, `PrivateNetwork` except localhost).
 
 ## Phase 6: Input & Accessibility
 **Goal**: Two-way interaction.

@@ -18,6 +18,18 @@ This document provides a complete reference for GUI developers and integrators w
 busctl --user introspect org.speech.Service /org/speech/Service
 ```
 
+## Core / Diagnostic Methods
+
+### `Ping() → String` (Phase 14)
+
+Diagnostic method to verify D-Bus connectivity.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service Ping
+```
+
+**Returns:** `"pong"`
+
 ---
 
 ## Core TTS Methods
@@ -510,4 +522,4 @@ journalctl --user -u speechd-ng -f
 
 ---
 
-*Last Updated: 2025-12-27*
+*Last Updated: 2025-12-28*

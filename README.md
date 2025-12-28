@@ -115,10 +115,9 @@ See **[docs/API_REFERENCE.md](docs/API_REFERENCE.md)** for the complete D-Bus AP
 - Rust integration examples
 - Error handling guidelines
 
-### Method Summary
-
 | Category | Methods |
 |----------|---------|
+| **Core** | `Ping`, `GetStatus` |
 | **TTS** | `Speak`, `SpeakVoice`, `ListVoices`, `ListDownloadableVoices`, `DownloadVoice` |
 | **AI** | `Think`, `Listen` |
 | **Training** | `AddCorrection`, `TrainWord`, `ListPatterns`, `GetFingerprintStats` |
@@ -187,7 +186,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Imp
 | 10 | Pattern Import/Export | ✅ Complete |
 | 11 | Ignored Commands | ✅ Complete |
 | 12 | Improved VAD | ✅ Complete |
-| 13 | Wyoming Protocol | ✅ Complete |
+| 14 | Hardening & Packaging | ✅ Complete |
 
 ## 🔒 Security
 

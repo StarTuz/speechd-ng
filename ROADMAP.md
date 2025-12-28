@@ -99,9 +99,10 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **Configurable Backend**: Switch between `vosk` and `wyoming` in config.
 -   [x] **D-Bus Info API**: Get current backend info and status.
 
-## Phase 14: Hardening & Packaging (📋 Planned)
+## Phase 14: Hardening & Packaging (✅ Completed)
 **Goal**: Production readiness and distribution.
--   [x] **Packaging**: Create `.deb`, `.rpm`, and `Flatpak` manifests. (✅ Implemented)
--   [x] **Safety**: Implement `RollbackLastCorrection` to undo bad learning. (✅ Implemented)
--   [x] **Benchmarking**: Create latency/resource usage test suite. (✅ Implemented)
--   [x] **CI Hardening**: Add offline-mode verification tests. (✅ Implemented)
+-   [x] **Packaging**: Create `.deb`, `.rpm`, and `Flatpak` manifests.
+-   [x] **Safety**: Implement `RollbackLastCorrection` to undo bad learning.
+-   [x] **Benchmarking**: Create latency/resource usage test suite.
+-   [x] **CI Hardening**: Add offline-mode verification tests.
+

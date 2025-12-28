@@ -29,10 +29,47 @@ impl SpeechService {
         // Parallel Dispatch: Body speaks (if enabled), Brain remembers.
         if audio_enabled {
             if let Ok(engine) = self.engine.lock() {
-                engine.speak(&text);
+                engine.speak(&text, None);
             }
         }
         self.cortex.observe(text).await;
+    }
+
+    async fn speak_voice(&self, #[zbus(header)] _header: Header<'_>, text: String, voice: String) {
+         println!("Received speak request (voice: {}): {}", voice, text);
+         
+         let audio_enabled = config_loader::SETTINGS.read()
+            .map(|s| s.enable_audio)
+            .unwrap_or(true);
+
+         if audio_enabled {
+             if let Ok(engine) = self.engine.lock() {
+                 engine.speak(&text, Some(voice));
+             }
+         }
+         self.cortex.observe(text).await;
+    }
+
+    async fn list_voices(&self) -> Vec<(String, String)> {
+        // We return a tuple of (ID, Name) for simplicity over D-Bus
+        let voices = if let Ok(engine) = self.engine.lock() {
+            // Since list_voices is async, and we are inside a sync mutex lock, we can't await it easily HERE 
+            // if list_voices is on the engine struct. 
+            // BUT engine.list_voices() returns a Future.
+            // We need to clone the logic out or just not hold the lock while awaiting.
+            // Ideally: Clone the engine (it's Arc<Mutex> wrapper? No, AudioEngine is Clone via logic?)
+            // AudioEngine is Clone (it just has a sender).
+             Some(engine.clone())
+        } else {
+            None
+        };
+
+        if let Some(engine) = voices {
+             let list = engine.list_voices().await;
+             list.into_iter().map(|v| (v.id, v.name)).collect()
+        } else {
+             Vec::new()
+        }
     }
 
     async fn think(&self, #[zbus(header)] header: Header<'_>, query: String) -> String {

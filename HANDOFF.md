@@ -3,45 +3,44 @@
 ## Current Context
 We are building **SpeechD-NG**, a modern replacement for Linux command-line/desktop speech services. The project is written in **Rust** to ensure memory safety, speed, and concurrency.
 
-## Status: Phase 5 Partial (Plug-ins & Security)
-We have established the **Plugin Architecture** and reinforced security.
+## Status: Phase 5 Completed (Plug-ins & Voice System)
+We have implemented a fully extensible Voice System with Security Hardening.
 
 ### 1. Functional Features
--   **D-Bus Service**: Claims `org.speech.Service`.
--   **Audio Pipeline**: Threaded audio engine with **Process Timeouts**.
--   **The Cortex**: Aware of speech history and connected to Ollama.
--   **Security**:
-    -   **Systemd Sandbox**: Strict file/network/capability restrictions.
-    -   **LLM Sanitization**: Hardened prompts.
-    -   **Backend Safety**: 5-second timeout on speech synthesis processes.
+-   **Audio Pipeline**: 
+    -   Threaded audio engine with **Process Timeouts** (5s).
+    -   Parses `espeak-ng` voices dynamically.
+-   **D-Bus API**: 
+    -   `ListVoices()`: Returns `(VoiceID, Name)` pairs.
+    -   `SpeakVoice(text, voice_id)`: Speaks using the selected voice.
+-   **Architecture**:
+    -   **Pluggable Backends**: Traits allow swapping TTS engines.
+    -   **EspeakBackend**: Fully implemented.
 
-### 2. Architecture: Pluggable Backends
--   **`SpeechBackend` Trait**: Located in `src/backends/mod.rs`. Allows easy addition of new TTS engines.
--   **Current Backends**:
-    -   `EspeakBackend`: Wraps `espeak-ng` binary. Includes timeout logic using `wait-timeout` crate.
--   **Isolation**: Backends run in the Audio Thread, decoupled from the main D-Bus loop.
+### 2. Architecture & Security
+-   **Timeouts**: Synthesizer processes are killed if they hang, preventing DoS.
+-   **Sandboxing**: Systemd strict confinement.
+-   **LLM Safety**: Prompt injection filtering.
 
 ## File Structure
 ```
 src/
-├── main.rs          # D-Bus & Cortex/Engine orchestration
-├── engine.rs        # Audio Thread (Consumer of Backends)
-├── cortex.rs        # Memory & AI
-├── security.rs      # Polkit Stubs
-├── config_loader.rs # Settings
-└── backends/        # TTS Plugins
-    ├── mod.rs       # Trait definition
-    └── espeak.rs    # Espeak implementation
+├── main.rs          # D-Bus (Speak, SpeakVoice, ListVoices, Think)
+├── engine.rs        # Audio Actor (Voice Selection logic)
+├── backends/        # TTS Plugins
+│   ├── mod.rs       # Trait definition + Voice struct
+│   └── espeak.rs    # Espeak implementation (parsing & synthesis)
 ```
 
-## Immediate Next Steps (Phase 5 Completion)
-1.  **Voice Enumeration**: Add `ListVoices()` to the D-Bus API.
-2.  **Voice Selection**: Update `Speak()` to accept a voice ID.
-3.  **Piper Backend**: Implement `SpeechBackend` for the high-quality Piper TTS.
+## Immediate Next Steps (Phase 6)
+The next milestone is **Input & Accessibility**.
+
+1.  **Microphone Access**: Integrating a secure audio recorder stream.
+2.  **Speech-to-Text**: Using Whisper (via `burn` or `whisper.cpp`) to transact audio->text.
+3.  **Orca Shim**: Mimicking `speech-dispatcher` to support legitimate screen reader clients.
 
 ## Known Limitations
--   **Polkit**: Not yet blocking unprivileged calls (Hook exists).
--   **Voice Config**: Hardcoded to default voice in backend.
+-   **Voice Config Persistence**: The daemon doesn't remember the "default" voice across restarts (must be passed in `SpeakVoice` or defaults to espeak default).
 
 ## Repository
 -   **GitHub**: https://github.com/StarTuz/speechd-ng

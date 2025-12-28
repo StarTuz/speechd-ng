@@ -46,6 +46,11 @@ cargo build --release
 # Copy binary
 cp target/release/speechserverdaemon ~/.local/bin/
 
+# Copy Python bridges (Required for Wake Word & Wyoming)
+cp src/wakeword_bridge.py ~/.local/bin/
+cp src/wyoming_bridge.py ~/.local/bin/
+chmod +x ~/.local/bin/*.py
+
 # Install systemd service
 cp systemd/speechd-ng.service ~/.config/systemd/user/
 systemctl --user daemon-reload
@@ -66,6 +71,11 @@ piper_model = "en_US-lessac-medium"
 piper_binary = "piper"              # Or full path: /path/to/piper
 tts_backend = "piper"               # "piper" or "espeak"
 
+# Speech-to-Text (Vosk or Wyoming)
+stt_backend = "wyoming"             # "vosk" is default
+wyoming_host = "127.0.0.1"
+wyoming_port = 10301
+
 # Memory & Audio
 memory_size = 50
 enable_audio = true
@@ -74,6 +84,7 @@ enable_audio = true
 wake_word = "mango"
 enable_wake_word = false
 ```
+
 
 ## 📡 Quick Start
 
@@ -174,8 +185,8 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Imp
 | 9 | Manual Training API | ✅ Complete |
 | 10 | Pattern Import/Export | ✅ Complete |
 | 11 | Ignored Commands | ✅ Complete |
-| 12 | Improved VAD | 📋 Planned |
-| 13 | Wyoming Protocol | 📋 Future |
+| 12 | Improved VAD | ✅ Complete |
+| 13 | Wyoming Protocol | ✅ Complete |
 
 ## 🔒 Security
 

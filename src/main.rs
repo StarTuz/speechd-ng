@@ -30,6 +30,11 @@ impl SpeechService {
         "pong".to_string()
     }
 
+    #[zbus(name = "GetVersion")]
+    async fn get_version(&self) -> String {
+        env!("CARGO_PKG_VERSION").to_string()
+    }
+
     #[zbus(name = "Speak")]
     async fn speak(&self, #[zbus(header)] _header: Header<'_>, text: String) {
         println!("Received speak request: {}", text);

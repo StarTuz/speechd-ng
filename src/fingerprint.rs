@@ -75,12 +75,12 @@ impl Fingerprint {
 
         // Simple case: one word was corrected
         if errors.len() == 1 && corrections.len() == 1 {
-            self.learn(errors[0].to_string(), corrections[0].to_string());
+            self.add_passive_correction(errors[0].to_string(), corrections[0].to_string());
         }
     }
 
     /// Passive learning from LLM corrections (lower initial confidence)
-    pub fn learn(&self, heard: String, meant: String) {
+    pub fn add_passive_correction(&self, heard: String, meant: String) {
         if heard.is_empty() || meant.is_empty() || heard == meant {
             return;
         }

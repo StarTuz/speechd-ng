@@ -54,6 +54,9 @@ jobs:
     
     - name: Run Resilience Test
       run: |
+        # Ensure we have a runtime dir for D-Bus/Alsa if needed
+        export XDG_RUNTIME_DIR=/tmp
+        
         # Wrap everything in dbus-run-session so we have a bus
         dbus-run-session -- bash -c '
           # 1. Start Daemon with output captured
@@ -64,7 +67,8 @@ jobs:
           # 2. Wait for service to appear on bus (up to 30s)
           echo "Waiting for org.speech.Service to appear on bus..."
           for i in {1..30}; do
-            if busctl list | grep -q "org.speech.Service"; then
+            # Use busctl to look for the service name explicitly
+            if busctl --user list 2>/dev/null | grep -q "org.speech.Service"; then
                echo "Service is UP and owning name after $i seconds."
                break
             fi
@@ -74,6 +78,12 @@ jobs:
                exit 1
             fi
             sleep 1
+            if [ $i -eq 30 ]; then
+               echo "::error::Timeout waiting for service name!"
+               cat daemon.log
+               kill $DAEMON_PID
+               exit 1
+            fi
           done
 
           # 3. Run Benchmark/Check

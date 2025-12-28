@@ -17,14 +17,10 @@ The system is composed of three main layers:
     -   **Technology**: Rust + `zbus`.
     -   **Role**: Extremely lightweight router. Accepts D-Bus calls, manages state, and enforces security.
     -   **Status**: ✅ Implemented.
-2.  **The Audio Engine**:
-    -   **Technology**: `rodio` + `espeak-ng` (thread-isolated).
-    -   **Role**: Synthesizes text to speech in a dedicated thread. Ensures the main daemon *never* hangs, even if synthesis is slow.
-    -   **Status**: ✅ Implemented.
-3.  **The Cortex (Planned)**:
+3.  **The Cortex**:
     -   **Technology**: Asynchronous Tokio tasks + HTTP (Ollama).
     -   **Role**: "The Brain". Listens to speech history and context to provide Active/Passive learning features (e.g., "Recall what I said 5 minutes ago").
-    -   **Status**: 🚧 Planned (Phase 3).
+    -   **Status**: ✅ Implemented (Security Hardened).
 
 ## 🛠 Building & Installation
 
@@ -32,6 +28,7 @@ The system is composed of three main layers:
 -   Rust (Stable)
 -   `espeak-ng` (Runtime dependency for synthesis)
 -   `libdbus-1-dev` (Usually pre-installed)
+-   `Ollama` (Optional, for "Brain" features)
 
 ### Build
 ```bash
@@ -61,12 +58,27 @@ You can interact with the daemon using any D-Bus compliant tool or library.
 
 ### Example: Command Line
 ```bash
-# Speak (Body)
+# Speak (Default Voice)
 busctl --user call \
     org.speech.Service \
     /org/speech/Service \
     org.speech.Service \
-    Speak s "Hello, this is the future of Linux speech."
+    Speak s "Hello world."
+
+# List Available Voices
+# Returns array of (ID, Name) tuples
+busctl --user call \
+    org.speech.Service \
+    /org/speech/Service \
+    org.speech.Service \
+    ListVoices
+
+# Speak with Specific Voice
+busctl --user call \
+    org.speech.Service \
+    /org/speech/Service \
+    org.speech.Service \
+    SpeakVoice ss "Hello, I am British." "en-gb"
 
 # Think (Brain) - asks Ollama about the context
 busctl --user call \
@@ -81,5 +93,6 @@ busctl --user call \
 -   **Phase 1: Foundation** (✅ Completed) - Basic D-Bus Daemon.
 -   **Phase 2: Audio Engine** (✅ Completed) - Thread-safe Audio Synthesis.
 -   **Phase 3: The Cortex** (✅ Completed) - Ollama Integration & Context API.
--   **Phase 4: Security** - Polkit Integration & App permissions.
--   **Phase 5: Input & STT** - Microphone handling & Speech-to-Text streams.
+-   **Phase 4: Security & Config** (✅ Completed) - Systemd Sandboxing, LLM Sanitization, Config Loader.
+-   **Phase 5: Voice System** (✅ Completed) - Pluggable Backends (Plugin System), Voice Enumeration, Timeouts.
+-   **Phase 6: Input & STT** (🚧 Next Up) - Microphone handling & Speech-to-Text streams.

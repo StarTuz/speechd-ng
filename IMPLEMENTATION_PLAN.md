@@ -237,4 +237,29 @@ cat src/fingerprint.rs
 
 ---
 
-*Last Updated: 2025-12-27*
+## Phase 15: Streaming Media Player (TBD)
+
+**Goal**: Play audio from URLs directly via D-Bus, bypassing client-side player management.
+
+**Value**: Medium | **Effort**: Medium
+
+### Requirements
+- `PlayAudio(url: String)` method
+- Support for playback status events (Started, Finished)
+- Volume control and cancellation
+
+---
+
+## Phase 16: Multi-Channel Support (TBD)
+
+**Goal**: Support directed audio output for aviation headsets (COM1 vs COM2 separation).
+
+**Value**: High (for flight sim) | **Effort**: Medium
+
+### Requirements
+- `SpeakChannel(text: String, voice: String, channel: String)`
+- `channel` options: "default", "left", "right", "headset", "speakers"
+
+---
+
+*Last Updated: 2025-12-28*

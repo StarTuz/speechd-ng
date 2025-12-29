@@ -536,16 +536,30 @@ impl Ear {
 
     /// Transcribe using Vosk CLI
     fn transcribe_vosk(&self, path: &str) -> Result<String, String> {
+        println!("Ear: [Vosk] Starting transcription of {}...", path);
         let txt_path = path.replace(".wav", ".txt");
+        let start = std::time::Instant::now();
+        
         let output = Command::new("vosk-transcriber")
             .arg("-i").arg(path)
             .arg("-o").arg(&txt_path)
             .output();
 
-        if let Ok(out) = output {
-            if out.status.success() {
-                return std::fs::read_to_string(&txt_path)
-                    .map_err(|e| format!("Read error: {}", e));
+        match output {
+            Ok(out) => {
+                println!("Ear: [Vosk] Process finished in {:?}. Status: {}", start.elapsed(), out.status);
+                if out.status.success() {
+                    let content = std::fs::read_to_string(&txt_path)
+                        .map_err(|e| format!("Read error: {}", e))?;
+                    println!("Ear: [Vosk] Result: '{}'", content.trim());
+                    return Ok(content);
+                } else {
+                     let stderr = String::from_utf8_lossy(&out.stderr);
+                     println!("Ear: [Vosk] Failed. Stderr: {}", stderr);
+                }
+            },
+            Err(e) => {
+                println!("Ear: [Vosk] Command failed to start: {}", e);
             }
         }
         Err("Vosk transcriber failed".to_string())

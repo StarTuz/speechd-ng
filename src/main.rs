@@ -14,13 +14,14 @@ use security::SecurityAgent;
 use std::error::Error;
 use std::future::pending;
 use std::sync::{Arc, Mutex};
-use zbus::{interface, connection::Builder, message::Header};
+use zbus::{interface, connection::Builder, message::Header, Connection};
 
 struct SpeechService {
     engine: Arc<Mutex<AudioEngine>>,
     cortex: Cortex,
     ear: Arc<Mutex<Ear>>,
     fingerprint: Fingerprint,
+    conn: Connection,
 }
 
 #[interface(name = "org.speech.Service")]
@@ -107,8 +108,13 @@ impl SpeechService {
 
     #[zbus(name = "DownloadVoice")]
     async fn download_voice(&self, #[zbus(header)] header: Header<'_>, voice_id: String) -> String {
-        if let Err(e) = SecurityAgent::check_permission(&header, "org.speech.service.manage").await {
-            return format!("Access Denied: {}", e);
+        // Polkit authorization check
+        if let Some(sender) = header.sender() {
+            if let Ok(pid) = SecurityAgent::get_sender_pid(&self.conn, sender.as_str()).await {
+                if let Err(e) = SecurityAgent::check_permission_polkit(pid, "org.speech.service.manage").await {
+                    return format!("Access Denied: {}", e);
+                }
+            }
         }
 
         let engine = if let Ok(engine) = self.engine.lock() {
@@ -129,9 +135,14 @@ impl SpeechService {
 
     #[zbus(name = "Think")]
     async fn think(&self, #[zbus(header)] header: Header<'_>, query: String) -> String {
-        if let Err(e) = SecurityAgent::check_permission(&header, "org.speech.service.think").await {
-            eprintln!("Access Denied: {}", e);
-            return "Access Denied".to_string();
+        // Polkit authorization check
+        if let Some(sender) = header.sender() {
+            if let Ok(pid) = SecurityAgent::get_sender_pid(&self.conn, sender.as_str()).await {
+                if let Err(e) = SecurityAgent::check_permission_polkit(pid, "org.speech.service.think").await {
+                    eprintln!("Access Denied: {}", e);
+                    return "Access Denied".to_string();
+                }
+            }
         }
 
         let ai_enabled = config_loader::SETTINGS.read()
@@ -148,9 +159,14 @@ impl SpeechService {
 
     #[zbus(name = "Listen")]
     async fn listen(&self, #[zbus(header)] header: Header<'_>) -> String {
-        if let Err(e) = SecurityAgent::check_permission(&header, "org.speech.service.listen").await {
-            eprintln!("Access Denied: {}", e);
-            return "Access Denied".to_string();
+        // Polkit authorization check
+        if let Some(sender) = header.sender() {
+            if let Ok(pid) = SecurityAgent::get_sender_pid(&self.conn, sender.as_str()).await {
+                if let Err(e) = SecurityAgent::check_permission_polkit(pid, "org.speech.service.listen").await {
+                    eprintln!("Access Denied: {}", e);
+                    return "Access Denied".to_string();
+                }
+            }
         }
 
         println!("Received listen request");
@@ -174,9 +190,14 @@ impl SpeechService {
     /// Waits for speech, records until silence, then transcribes
     #[zbus(name = "ListenVad")]
     async fn listen_vad(&self, #[zbus(header)] header: Header<'_>) -> String {
-        if let Err(e) = SecurityAgent::check_permission(&header, "org.speech.service.listen").await {
-            eprintln!("Access Denied: {}", e);
-            return "Access Denied".to_string();
+        // Polkit authorization check
+        if let Some(sender) = header.sender() {
+            if let Ok(pid) = SecurityAgent::get_sender_pid(&self.conn, sender.as_str()).await {
+                if let Err(e) = SecurityAgent::check_permission_polkit(pid, "org.speech.service.listen").await {
+                    eprintln!("Access Denied: {}", e);
+                    return "Access Denied".to_string();
+                }
+            }
         }
 
         println!("Received VAD listen request");
@@ -216,9 +237,14 @@ impl SpeechService {
     /// Returns (what_asr_heard, success)
     #[zbus(name = "TrainWord")]
     async fn train_word(&self, #[zbus(header)] header: Header<'_>, expected: String, duration_secs: u32) -> (String, bool) {
-        if let Err(e) = SecurityAgent::check_permission(&header, "org.speech.service.train").await {
-            eprintln!("Access Denied for TrainWord: {}", e);
-            return ("Access Denied".to_string(), false);
+        // Polkit authorization check
+        if let Some(sender) = header.sender() {
+            if let Ok(pid) = SecurityAgent::get_sender_pid(&self.conn, sender.as_str()).await {
+                if let Err(e) = SecurityAgent::check_permission_polkit(pid, "org.speech.service.train").await {
+                    eprintln!("Access Denied for TrainWord: {}", e);
+                    return ("Access Denied".to_string(), false);
+                }
+            }
         }
 
         println!("Training word '{}' for {} seconds...", expected, duration_secs);
@@ -653,16 +679,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let ear = Arc::new(Mutex::new(Ear::new()));
     let fingerprint = Fingerprint::new();
 
-    let _conn = Builder::session()?
+    // Build the D-Bus connection first so we can clone it for SpeechService
+    let conn = Builder::session()?
         .name("org.speech.Service")?
-        .serve_at("/org/speech/Service", SpeechService { 
-            engine: engine.clone(), 
-            cortex: cortex.clone(), 
-            ear: ear.clone(),
-            fingerprint: fingerprint.clone(),
-        })?
         .build()
         .await?;
+    
+    // Register the service interface with a clone of the connection
+    conn.object_server().at("/org/speech/Service", SpeechService { 
+        engine: engine.clone(), 
+        cortex: cortex.clone(), 
+        ear: ear.clone(),
+        fingerprint: fingerprint.clone(),
+        conn: conn.clone(),
+    }).await?;
 
     println!("Speech Service running at org.speech.Service");
 

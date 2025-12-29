@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>SpeechD-NG</vendor>
+  <vendor_url>https://github.com/StarTuz/speechd-ng</vendor_url>
+
+  <!-- Voice Management (download voices) -->
+  <action id="org.speech.service.manage">
+    <description>Manage speech synthesis voices</description>
+    <description xml:lang="en">Download or remove TTS voice models</description>
+    <message>Authentication is required to manage speech voices</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+  </action>
+
+  <!-- AI/Think Feature -->
+  <action id="org.speech.service.think">
+    <description>Use AI assistant features</description>
+    <message>Authentication is required to use AI features</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+  </action>
+
+  <!-- Microphone/Listening -->
+  <action id="org.speech.service.listen">
+    <description>Use microphone for speech recognition</description>
+    <message>Authentication is required to access the microphone</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+  </action>
+
+  <!-- Voice Training -->
+  <action id="org.speech.service.train">
+    <description>Train voice recognition patterns</description>
+    <message>Authentication is required to train voice patterns</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+  </action>
+
+</policyconfig>

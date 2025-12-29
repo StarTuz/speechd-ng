@@ -17,6 +17,7 @@ We have completed **Phase 16a** of the roadmap. **SpeechD-NG v0.4.0** now includ
 | 15 | Streaming Media Player | ✅ |
 | 16a | Multi-Channel Audio (Stereo Panning) | ✅ |
 | 16b | PipeWire Device Routing | ✅ |
+| 17a | Polkit Enforcement | ✅ |
 
 ## Functional Features
 

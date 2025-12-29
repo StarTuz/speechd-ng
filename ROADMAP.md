@@ -130,3 +130,11 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **Use Case: Multi-device**: Headset for voice, speakers for ambient.
 -   [x] **Use Case: Home Automation**: Announce to kitchen vs living room.
 
+## Phase 17a: Polkit Enforcement (✅ Completed)
+**Goal**: Real PolicyKit authorization for sensitive D-Bus methods.
+-   [x] **zbus_polkit Integration**: Real CheckAuthorization calls to PolicyKit.
+-   [x] **Policy File**: `org.speech.service.policy` with action definitions.
+-   [x] **Protected Methods**: DownloadVoice, Think, Listen, ListenVad, TrainWord.
+-   [x] **Desktop Sessions**: Auto-approve for active desktop users.
+-   [x] **Remote/Inactive**: Require admin authentication.
+

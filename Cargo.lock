@@ -2492,7 +2492,7 @@ dependencies = [
 
 [[package]]
 name = "speechserverdaemon"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "chrono",
  "config",
@@ -2508,6 +2508,7 @@ dependencies = [
  "tokio",
  "wait-timeout",
  "zbus",
+ "zbus_polkit",
 ]
 
 [[package]]
@@ -3648,6 +3649,19 @@ dependencies = [
  "serde",
  "static_assertions",
  "zvariant",
+]
+
+[[package]]
+name = "zbus_polkit"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00a29bfa927b29f91b7feb4e1990f2dd1b4604072f493dc2f074cf59e4e0ba90"
+dependencies = [
+ "enumflags2",
+ "serde",
+ "serde_repr",
+ "static_assertions",
+ "zbus",
 ]
 
 [[package]]

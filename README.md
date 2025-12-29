@@ -190,6 +190,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Imp
 | 15 | Streaming Media Player | ✅ Complete |
 | 16a | Multi-Channel Audio | ✅ Complete |
 | 16b | PipeWire Device Routing | ✅ Complete |
+| 17a | Polkit Enforcement | ✅ Complete |
 
 ## 🔒 Security
 

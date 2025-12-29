@@ -394,6 +394,11 @@ impl SpeechService {
     // ========== Phase 13: Wyoming Protocol ==========
 
     /// Get current STT backend ("vosk" or "wyoming")
+    #[zbus(name = "GetSttBackend")]
+    async fn get_stt_backend(&self) -> zbus::fdo::Result<String> {
+        Ok(config_loader::SETTINGS.read().unwrap().stt_backend.clone())
+    }
+
     /// Returns diagnostic status: (ai_enabled, passive_threshold, stt_backend, total_patterns)
     async fn get_status(&self) -> zbus::fdo::Result<(bool, f32, String, u32)> {
         let (ai, thresh, stt) = {

@@ -22,6 +22,11 @@ We have completed **Phase 16a** of the roadmap. **SpeechD-NG v0.4.0** now includ
 | 16c | 5.1 Surround Support | ✅ |
 | 18 | System Hardening | ✅ |
 
+## Release Artifacts
+All release packages are collected in the `dist/` directory:
+- **Debian**: `dist/speechserverdaemon_0.7.1-1_amd64.deb`
+- **Binary**: `target/release/speechserverdaemon`
+
 ## Functional Features
 
 ### TTS & Speech

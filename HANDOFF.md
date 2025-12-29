@@ -19,6 +19,7 @@ We have completed **Phase 16a** of the roadmap. **SpeechD-NG v0.4.0** now includ
 | 16b | PipeWire Device Routing | ✅ |
 | 17a | Polkit Enforcement | ✅ |
 | 17b | Rate Limiting | ✅ |
+| 16c | 5.1 Surround Support | ✅ |
 
 ## Functional Features
 

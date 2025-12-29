@@ -130,6 +130,12 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **Use Case: Multi-device**: Headset for voice, speakers for ambient.
 -   [x] **Use Case: Home Automation**: Announce to kitchen vs living room.
 
+## Phase 16c: Enhanced Multi-Channel Support (✅ Completed)
+**Goal**: Support 5.1 Surround Sound output.
+-   [x] **5.1 Mapping**: Native 6-channel output for `rear-left`, `lfe`, etc.
+-   [x] **Keywords**: Support `rear-left`, `rear-right`, `center-real`, `lfe`.
+-   [x] **Dynamic Switching**: Switch between Stereo (2ch) and Surround (6ch) based on request.
+
 ## Phase 17a: Polkit Enforcement (✅ Completed)
 **Goal**: Real PolicyKit authorization for sensitive D-Bus methods.
 -   [x] **zbus_polkit Integration**: Real CheckAuthorization calls to PolicyKit.

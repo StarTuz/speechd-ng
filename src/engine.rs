@@ -359,18 +359,25 @@ impl AudioEngine {
                                                         use rodio::source::ChannelVolume;
                                                         
                                                         // Get channel volumes for L/R stereo output
+                                                        // Get channel volumes for L/R stereo or 5.1 surround output
                                                         // ChannelVolume makes mono and routes to specified channels
-                                                        let channel_vols: Vec<f32> = match channel.to_lowercase().as_str() {
-                                                            "left" => vec![current_volume, 0.0],  // Left only
-                                                            "right" => vec![0.0, current_volume], // Right only
-                                                            "center" => vec![current_volume * 0.7, current_volume * 0.7], // Both
-                                                            _ => vec![current_volume, current_volume], // Full stereo
+                                                        // 5.1 Layout: FL, FR, C, LFE, RL, RR
+                                                        let (channel_vols, description) = match channel.to_lowercase().as_str() {
+                                                            "left" | "front-left" => (vec![current_volume, 0.0], "Stereo Left"),
+                                                            "right" | "front-right" => (vec![0.0, current_volume], "Stereo Right"),
+                                                            "center" | "front-center" => (vec![current_volume * 0.7, current_volume * 0.7], "Stereo Phantom Center"), // Phantom center for stereo compatibility
+                                                            // 5.1 Surround mappings
+                                                            "rear-left" | "surround-left" => (vec![0.0, 0.0, 0.0, 0.0, current_volume, 0.0], "Surround Rear-Left"),
+                                                            "rear-right" | "surround-right" => (vec![0.0, 0.0, 0.0, 0.0, 0.0, current_volume], "Surround Rear-Right"),
+                                                            "center-real" | "real-center" => (vec![0.0, 0.0, current_volume, 0.0, 0.0, 0.0], "Surround Center"),
+                                                            "lfe" | "subwoofer" => (vec![0.0, 0.0, 0.0, current_volume, 0.0, 0.0], "Surround LFE"),
+                                                            _ => (vec![current_volume, current_volume], "Stereo Full"), // Default
                                                         };
                                                         
-                                                        println!("Audio Thread: Playing to channel '{}' (L:{:.2}, R:{:.2})", 
-                                                            channel, channel_vols[0], channel_vols[1]);
+                                                        println!("Audio Thread: Playing to channel '{}' ({})", channel, description);
                                                         
-                                                        // Wrap source with ChannelVolume for true L/R separation
+                                                        // Wrap source with ChannelVolume for true channel separation
+                                                        // If channel_vols has 6 elements, output will be 6-channel (5.1)
                                                         let panned = ChannelVolume::new(
                                                             source.convert_samples::<f32>(),
                                                             channel_vols

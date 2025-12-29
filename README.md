@@ -191,6 +191,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Imp
 | 16a | Multi-Channel Audio | ✅ Complete |
 | 16b | PipeWire Device Routing | ✅ Complete |
 | 17a | Polkit Enforcement | ✅ Complete |
+| 17b | Rate Limiting | ✅ Complete |
 
 ## 🔒 Security
 

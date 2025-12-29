@@ -138,3 +138,10 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **Desktop Sessions**: Auto-approve for active desktop users.
 -   [x] **Remote/Inactive**: Require admin authentication.
 
+## Phase 17b: Rate Limiting (✅ Completed)
+**Goal**: Prevent abuse by throttling requests per D-Bus sender.
+-   [x] **Token Bucket**: Per-sender throttling algorithm.
+-   [x] **Configurable Limits**: `rate_limit_tts`, `rate_limit_ai` in `Speech.toml`.
+-   [x] **Enforcement**: Methods return D-Bus error when limit exceeded.
+-   [x] **Protected Methods**: Speak*, Think, PlayAudio, Listen*.
+

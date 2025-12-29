@@ -31,6 +31,11 @@ pub struct Settings {
     pub max_audio_size_mb: u64,    // Max audio file download size in MB
     pub playback_timeout_secs: u64, // Timeout for audio downloads
     pub playback_volume: f32,      // Default volume (0.0 - 1.0)
+    // Rate Limiting Settings (Phase 17b)
+    pub rate_limit_tts: u32,       // TTS requests per minute
+    pub rate_limit_ai: u32,        // AI/Think requests per minute
+    pub rate_limit_audio: u32,     // PlayAudio requests per minute
+    pub rate_limit_listen: u32,    // Listen requests per minute
 }
 
 impl Default for Settings {
@@ -62,6 +67,11 @@ impl Default for Settings {
             max_audio_size_mb: 50,
             playback_timeout_secs: 30,
             playback_volume: 1.0,
+            // Rate Limiting defaults (Phase 17b)
+            rate_limit_tts: 30,
+            rate_limit_ai: 10,
+            rate_limit_audio: 20,
+            rate_limit_listen: 30,
         }
     }
 }
@@ -102,6 +112,11 @@ impl Settings {
             .set_default("max_audio_size_mb", 50)?
             .set_default("playback_timeout_secs", 30)?
             .set_default("playback_volume", 1.0)?
+            // Rate Limiting defaults (Phase 17b)
+            .set_default("rate_limit_tts", 30)?
+            .set_default("rate_limit_ai", 10)?
+            .set_default("rate_limit_audio", 20)?
+            .set_default("rate_limit_listen", 30)?
             // Merge with local config file (if exists)
             .add_source(File::with_name("Speech").required(false))
             .add_source(File::with_name(&format!("{}/.config/speechd-ng/Speech", std::env::var("HOME").unwrap_or_default())).required(false))

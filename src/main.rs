@@ -6,11 +6,13 @@ mod backends;
 mod ear;
 mod ssip;
 mod fingerprint;
+mod rate_limiter;
 use engine::AudioEngine;
 use cortex::Cortex;
 use ear::Ear;
 use fingerprint::Fingerprint;
 use security::SecurityAgent;
+use rate_limiter::{RateLimiter, LimitType};
 use std::error::Error;
 use std::future::pending;
 use std::sync::{Arc, Mutex};
@@ -22,6 +24,7 @@ struct SpeechService {
     ear: Arc<Mutex<Ear>>,
     fingerprint: Fingerprint,
     conn: Connection,
+    rate_limiter: Arc<RateLimiter>,
 }
 
 #[interface(name = "org.speech.Service")]
@@ -37,7 +40,15 @@ impl SpeechService {
     }
 
     #[zbus(name = "Speak")]
-    async fn speak(&self, #[zbus(header)] _header: Header<'_>, text: String) {
+    async fn speak(&self, #[zbus(header)] header: Header<'_>, text: String) -> zbus::fdo::Result<()> {
+        // Rate limit check
+        if let Some(sender) = header.sender() {
+            if !self.rate_limiter.check(sender.as_str(), LimitType::Tts) {
+                println!("Rate limited: TTS for sender {}", sender);
+                return Err(zbus::fdo::Error::Failed("Rate limited".into()));
+            }
+        }
+        
         println!("Received speak request: {}", text);
         
         let audio_enabled = config_loader::SETTINGS.read()
@@ -53,10 +64,19 @@ impl SpeechService {
         if ai_enabled {
             self.cortex.observe(text).await;
         }
+        Ok(())
     }
 
     #[zbus(name = "SpeakVoice")]
-    async fn speak_voice(&self, #[zbus(header)] _header: Header<'_>, text: String, voice: String) {
+    async fn speak_voice(&self, #[zbus(header)] header: Header<'_>, text: String, voice: String) -> zbus::fdo::Result<()> {
+         // Rate limit check
+         if let Some(sender) = header.sender() {
+             if !self.rate_limiter.check(sender.as_str(), LimitType::Tts) {
+                 println!("Rate limited: TTS for sender {}", sender);
+                 return Err(zbus::fdo::Error::Failed("Rate limited".into()));
+             }
+         }
+         
          println!("Received speak request (voice: {}): {}", voice, text);
          
          let audio_enabled = config_loader::SETTINGS.read()
@@ -72,6 +92,7 @@ impl SpeechService {
          if ai_enabled {
              self.cortex.observe(text).await;
          }
+         Ok(())
     }
 
     #[zbus(name = "ListVoices")]
@@ -134,14 +155,19 @@ impl SpeechService {
     }
 
     #[zbus(name = "Think")]
-    async fn think(&self, #[zbus(header)] header: Header<'_>, query: String) -> String {
+    async fn think(&self, #[zbus(header)] header: Header<'_>, query: String) -> zbus::fdo::Result<String> {
         // Polkit authorization check
         if let Some(sender) = header.sender() {
             if let Ok(pid) = SecurityAgent::get_sender_pid(&self.conn, sender.as_str()).await {
                 if let Err(e) = SecurityAgent::check_permission_polkit(pid, "org.speech.service.think").await {
                     eprintln!("Access Denied: {}", e);
-                    return "Access Denied".to_string();
+                    return Err(zbus::fdo::Error::AccessDenied("Polkit denied".into()));
                 }
+            }
+            // Rate limit check
+            if !self.rate_limiter.check(sender.as_str(), LimitType::Ai) {
+                println!("Rate limited: AI for sender {}", sender);
+                return Err(zbus::fdo::Error::Failed("Rate limited".into()));
             }
         }
 
@@ -150,22 +176,28 @@ impl SpeechService {
             .unwrap_or(true);
 
         if !ai_enabled {
-            return "AI Disabled".to_string();
+            return Ok("AI disabled".to_string());
         }
 
         println!("Received thought query: {}", query);
-        self.cortex.query(query).await
+        let response = self.cortex.query(query).await;
+        Ok(response)
     }
 
     #[zbus(name = "Listen")]
-    async fn listen(&self, #[zbus(header)] header: Header<'_>) -> String {
+    async fn listen(&self, #[zbus(header)] header: Header<'_>) -> zbus::fdo::Result<String> {
         // Polkit authorization check
         if let Some(sender) = header.sender() {
             if let Ok(pid) = SecurityAgent::get_sender_pid(&self.conn, sender.as_str()).await {
                 if let Err(e) = SecurityAgent::check_permission_polkit(pid, "org.speech.service.listen").await {
                     eprintln!("Access Denied: {}", e);
-                    return "Access Denied".to_string();
+                    return Err(zbus::fdo::Error::AccessDenied("Polkit denied".into()));
                 }
+            }
+            // Rate limit check
+            if !self.rate_limiter.check(sender.as_str(), LimitType::Listen) {
+                println!("Rate limited: Listen for sender {}", sender);
+                return Err(zbus::fdo::Error::Failed("Rate limited".into()));
             }
         }
 
@@ -181,22 +213,27 @@ impl SpeechService {
         }).await;
 
         match result {
-            Ok(s) => s,
-            Err(e) => format!("Error joining audio task: {}", e),
+            Ok(s) => Ok(s),
+            Err(e) => Ok(format!("Error joining audio task: {}", e)),
         }
     }
 
     /// Listen with Voice Activity Detection (Phase 12)
     /// Waits for speech, records until silence, then transcribes
     #[zbus(name = "ListenVad")]
-    async fn listen_vad(&self, #[zbus(header)] header: Header<'_>) -> String {
+    async fn listen_vad(&self, #[zbus(header)] header: Header<'_>) -> zbus::fdo::Result<String> {
         // Polkit authorization check
         if let Some(sender) = header.sender() {
             if let Ok(pid) = SecurityAgent::get_sender_pid(&self.conn, sender.as_str()).await {
                 if let Err(e) = SecurityAgent::check_permission_polkit(pid, "org.speech.service.listen").await {
                     eprintln!("Access Denied: {}", e);
-                    return "Access Denied".to_string();
+                    return Err(zbus::fdo::Error::AccessDenied("Polkit denied".into()));
                 }
+            }
+            // Rate limit check
+            if !self.rate_limiter.check(sender.as_str(), LimitType::Listen) {
+                println!("Rate limited: Listen for sender {}", sender);
+                return Err(zbus::fdo::Error::Failed("Rate limited".into()));
             }
         }
 
@@ -212,8 +249,8 @@ impl SpeechService {
         }).await;
 
         match result {
-            Ok(s) => s,
-            Err(e) => format!("Error joining audio task: {}", e),
+            Ok(s) => Ok(s),
+            Err(e) => Ok(format!("Error joining audio task: {}", e)),
         }
     }
 
@@ -386,22 +423,30 @@ impl SpeechService {
     /// Play audio from a URL
     /// Returns empty string on success, error message on failure
     #[zbus(name = "PlayAudio")]
-    async fn play_audio(&self, url: String) -> String {
+    async fn play_audio(&self, #[zbus(header)] header: Header<'_>, url: String) -> zbus::fdo::Result<String> {
+        // Rate limit check
+        if let Some(sender) = header.sender() {
+            if !self.rate_limiter.check(sender.as_str(), LimitType::Audio) {
+                println!("Rate limited: Audio for sender {}", sender);
+                return Err(zbus::fdo::Error::Failed("Rate limited".into()));
+            }
+        }
+        
         println!("Received PlayAudio request for URL: {}", url);
         
         let engine = if let Ok(engine) = self.engine.lock() {
             Some(engine.clone())
         } else {
-            return "Error: Engine locked".to_string();
+            return Err(zbus::fdo::Error::Failed("Engine locked".into()));
         };
         
         if let Some(engine) = engine {
             match engine.play_audio(&url).await {
-                Ok(()) => String::new(),  // Empty string = success
-                Err(e) => e,
+                Ok(()) => Ok(String::new()),  // Empty string = success
+                Err(e) => Ok(e), // Legacy: return error as string for now if not rate limited
             }
         } else {
-            "Error: No engine".to_string()
+             Err(zbus::fdo::Error::Failed("No engine".into()))
         }
     }
     
@@ -685,6 +730,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .build()
         .await?;
     
+    // Initialize rate limiter from config
+    let config = config_loader::SETTINGS.read().unwrap();
+    println!("Loaded Rate Limits - TTS: {}, AI: {}, Audio: {}, Listen: {}", 
+        config.rate_limit_tts, config.rate_limit_ai, config.rate_limit_audio, config.rate_limit_listen);
+        
+    let rate_limiter = Arc::new(RateLimiter::new(
+        config.rate_limit_tts,
+        config.rate_limit_ai,
+        config.rate_limit_audio,
+        config.rate_limit_listen,
+    ));
+    drop(config); // Release the read lock
+    
     // Register the service interface with a clone of the connection
     conn.object_server().at("/org/speech/Service", SpeechService { 
         engine: engine.clone(), 
@@ -692,6 +750,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         ear: ear.clone(),
         fingerprint: fingerprint.clone(),
         conn: conn.clone(),
+        rate_limiter: rate_limiter.clone(),
     }).await?;
 
     println!("Speech Service running at org.speech.Service");

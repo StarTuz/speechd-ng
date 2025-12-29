@@ -2,9 +2,9 @@
 
 ## Current Context
 
-We have completed **Phase 14** of the roadmap. **SpeechD-NG v0.2.0** is now a fully-featured, self-improving, hands-free speech assistant that is **production-hardened and package-ready**.
+We have completed **Phase 15** of the roadmap. **SpeechD-NG v0.3.0** is now a fully-featured, self-improving, hands-free speech assistant with **streaming media playback** capabilities.
 
-## Status: All Phases Completed (1-14)
+## Status: All Phases Completed (1-15)
 
 ### Completed Phases
 
@@ -14,6 +14,7 @@ We have completed **Phase 14** of the roadmap. **SpeechD-NG v0.2.0** is now a fu
 | 12 | Improved VAD (Voice Activity Detection) | ✅ |
 | 13 | Wyoming Protocol (Remote ASR) | ✅ |
 | 14 | Hardening & Packaging | ✅ |
+| 15 | Streaming Media Player | ✅ |
 
 ## Functional Features
 
@@ -48,6 +49,12 @@ We have completed **Phase 14** of the roadmap. **SpeechD-NG v0.2.0** is now a fu
 - `GetSttBackend()` - Get current backend (vosk/wyoming)
 - `GetWyomingInfo()` - Get host/port/model info
 - `GetStatus()` - Get diagnostic summary (ai_enabled, threshold, backend, patterns)
+
+**Streaming Media Player (Phase 15):**
+- `PlayAudio(url)` - Play audio from URL (returns empty on success, error on failure)
+- `StopAudio()` - Stop current playback
+- `SetVolume(volume)` / `GetVolume()` - Volume control (0.0-1.0)
+- `GetPlaybackStatus()` - Get (is_playing, current_url)
 
 ### Service Details
 | Property | Value |

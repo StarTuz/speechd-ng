@@ -14,6 +14,11 @@ enum AudioMessage {
     ListVoices(oneshot::Sender<Vec<Voice>>),
     ListDownloadableVoices(oneshot::Sender<Vec<Voice>>),
     DownloadVoice(String, oneshot::Sender<std::io::Result<()>>),
+    // Phase 15: Streaming Media Player
+    PlayAudio(String, oneshot::Sender<Result<(), String>>),  // (url, response)
+    StopAudio(oneshot::Sender<bool>),                        // Returns true if stopped
+    SetVolume(f32, oneshot::Sender<bool>),                   // (volume 0.0-1.0, success)
+    GetPlaybackStatus(oneshot::Sender<(bool, String)>),      // (is_playing, current_url)
 }
 
 #[derive(Clone)]
@@ -46,6 +51,14 @@ impl AudioEngine {
                     None
                 }
             };
+            
+            // Phase 15: Playback state tracking
+            let mut current_volume: f32 = {
+                let s = crate::config_loader::SETTINGS.read().unwrap();
+                s.playback_volume
+            };
+            let mut current_url: Option<String> = None;
+            let mut active_sink: Option<Sink> = None;
             
             while let Ok(msg) = rx.recv() {
                 match msg {
@@ -102,6 +115,7 @@ impl AudioEngine {
                                                     Ok(source) => {
                                                         use rodio::Source;
                                                         println!("Audio Thread: Playing audio...");
+                                                        sink.set_volume(current_volume);
                                                         sink.append(source.convert_samples::<f32>());
                                                         sink.sleep_until_end();
                                                         println!("Audio Thread: Playback complete");
@@ -163,7 +177,136 @@ impl AudioEngine {
                         } else {
                             let _ = resp_tx.send(Err(std::io::Error::new(std::io::ErrorKind::NotFound, format!("Backend {} not found", target_backend_id))));
                         }
-                    }
+                    },
+                    
+                    // ========== Phase 15: Streaming Media Player ==========
+                    AudioMessage::PlayAudio(url, resp_tx) => {
+                        println!("Audio Thread: PlayAudio request for URL: {}", url);
+                        
+                        // Validate URL
+                        if !url.starts_with("http://") && !url.starts_with("https://") {
+                            let _ = resp_tx.send(Err("Invalid URL: must start with http:// or https://".to_string()));
+                            continue;
+                        }
+                        
+                        // Get config
+                        let (max_size_bytes, timeout_secs) = {
+                            let s = crate::config_loader::SETTINGS.read().unwrap();
+                            (s.max_audio_size_mb * 1024 * 1024, s.playback_timeout_secs)
+                        };
+                        
+                        // Download the audio
+                        let client = match reqwest::blocking::Client::builder()
+                            .timeout(std::time::Duration::from_secs(timeout_secs))
+                            .build() 
+                        {
+                            Ok(c) => c,
+                            Err(e) => {
+                                let _ = resp_tx.send(Err(format!("Failed to create HTTP client: {}", e)));
+                                continue;
+                            }
+                        };
+                        
+                        match client.get(&url).send() {
+                            Ok(response) => {
+                                if !response.status().is_success() {
+                                    let _ = resp_tx.send(Err(format!("HTTP error: {}", response.status())));
+                                    continue;
+                                }
+                                
+                                // Check content length if available
+                                if let Some(len) = response.content_length() {
+                                    if len > max_size_bytes {
+                                        let _ = resp_tx.send(Err(format!("Audio too large: {} bytes (max: {} bytes)", len, max_size_bytes)));
+                                        continue;
+                                    }
+                                }
+                                
+                                match response.bytes() {
+                                    Ok(audio_data) => {
+                                        if audio_data.len() as u64 > max_size_bytes {
+                                            let _ = resp_tx.send(Err(format!("Audio too large: {} bytes", audio_data.len())));
+                                            continue;
+                                        }
+                                        
+                                        println!("Audio Thread: Downloaded {} bytes from {}", audio_data.len(), url);
+                                        
+                                        if let Some(ref handle) = stream_handle {
+                                            let cursor = Cursor::new(audio_data.to_vec());
+                                            match Sink::try_new(handle) {
+                                                Ok(sink) => {
+                                                    match Decoder::new(cursor) {
+                                                        Ok(source) => {
+                                                            use rodio::Source;
+                                                            sink.set_volume(current_volume);
+                                                            current_url = Some(url.clone());
+                                                            active_sink = Some(sink);
+                                                            
+                                                            // Get reference to active sink
+                                                            if let Some(ref s) = active_sink {
+                                                                println!("Audio Thread: Playing audio from URL...");
+                                                                s.append(source.convert_samples::<f32>());
+                                                                let _ = resp_tx.send(Ok(()));
+                                                                s.sleep_until_end();
+                                                                println!("Audio Thread: URL playback complete");
+                                                            }
+                                                            
+                                                            // Clear state after playback
+                                                            current_url = None;
+                                                            active_sink = None;
+                                                        }
+                                                        Err(e) => {
+                                                            let _ = resp_tx.send(Err(format!("Failed to decode audio: {}", e)));
+                                                        }
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    let _ = resp_tx.send(Err(format!("Failed to create audio sink: {}", e)));
+                                                }
+                                            }
+                                        } else {
+                                            println!("Audio Thread (Headless): Skipping URL playback");
+                                            let _ = resp_tx.send(Ok(()));
+                                        }
+                                    }
+                                    Err(e) => {
+                                        let _ = resp_tx.send(Err(format!("Failed to read audio data: {}", e)));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                let _ = resp_tx.send(Err(format!("Failed to fetch audio: {}", e)));
+                            }
+                        }
+                    },
+                    
+                    AudioMessage::StopAudio(resp_tx) => {
+                        if let Some(ref sink) = active_sink {
+                            sink.stop();
+                            current_url = None;
+                            active_sink = None;
+                            println!("Audio Thread: Stopped playback");
+                            let _ = resp_tx.send(true);
+                        } else {
+                            let _ = resp_tx.send(false);
+                        }
+                    },
+                    
+                    AudioMessage::SetVolume(volume, resp_tx) => {
+                        let clamped = volume.clamp(0.0, 1.0);
+                        current_volume = clamped;
+                        if let Some(ref sink) = active_sink {
+                            sink.set_volume(clamped);
+                        }
+                        println!("Audio Thread: Volume set to {:.2}", clamped);
+                        let _ = resp_tx.send(true);
+                    },
+                    
+                    AudioMessage::GetPlaybackStatus(resp_tx) => {
+                        let is_playing = active_sink.as_ref().map_or(false, |s| !s.empty());
+                        let url = current_url.clone().unwrap_or_default();
+                        let _ = resp_tx.send((is_playing, url));
+                    },
                 }
             }
         });
@@ -197,5 +340,39 @@ impl AudioEngine {
         let (tx, rx) = oneshot::channel();
         let _ = self.tx.send(AudioMessage::DownloadVoice(voice_id, tx));
         rx.await.map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, "Audio thread crashed"))?
+    }
+    
+    // ========== Phase 15: Streaming Media Player ==========
+    
+    /// Play audio from a URL
+    /// Returns Ok(()) on success, Err(message) on failure
+    pub async fn play_audio(&self, url: &str) -> Result<(), String> {
+        let (tx, rx) = oneshot::channel();
+        let _ = self.tx.send(AudioMessage::PlayAudio(url.to_string(), tx));
+        rx.await.map_err(|_| "Audio thread crashed".to_string())?
+    }
+    
+    /// Stop current audio playback
+    /// Returns true if something was stopped
+    pub async fn stop_audio(&self) -> bool {
+        let (tx, rx) = oneshot::channel();
+        let _ = self.tx.send(AudioMessage::StopAudio(tx));
+        rx.await.unwrap_or(false)
+    }
+    
+    /// Set playback volume (0.0 - 1.0)
+    /// Returns true on success
+    pub async fn set_volume(&self, volume: f32) -> bool {
+        let (tx, rx) = oneshot::channel();
+        let _ = self.tx.send(AudioMessage::SetVolume(volume, tx));
+        rx.await.unwrap_or(false)
+    }
+    
+    /// Get current playback status
+    /// Returns (is_playing, current_url)
+    pub async fn get_playback_status(&self) -> (bool, String) {
+        let (tx, rx) = oneshot::channel();
+        let _ = self.tx.send(AudioMessage::GetPlaybackStatus(tx));
+        rx.await.unwrap_or((false, String::new()))
     }
 }

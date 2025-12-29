@@ -27,6 +27,10 @@ pub struct Settings {
     pub wyoming_port: u16,
     pub wyoming_auto_start: bool,
     pub wyoming_model: String,     // "tiny", "base", "small", "medium", "large"
+    // Media Player Settings (Phase 15)
+    pub max_audio_size_mb: u64,    // Max audio file download size in MB
+    pub playback_timeout_secs: u64, // Timeout for audio downloads
+    pub playback_volume: f32,      // Default volume (0.0 - 1.0)
 }
 
 impl Default for Settings {
@@ -54,6 +58,10 @@ impl Default for Settings {
             wyoming_port: 10301,
             wyoming_auto_start: true,
             wyoming_model: "tiny".to_string(),
+            // Media Player defaults (Phase 15)
+            max_audio_size_mb: 50,
+            playback_timeout_secs: 30,
+            playback_volume: 1.0,
         }
     }
 }
@@ -90,6 +98,10 @@ impl Settings {
             .set_default("wyoming_port", 10301)?
             .set_default("wyoming_auto_start", true)?
             .set_default("wyoming_model", "tiny")?
+            // Media Player defaults (Phase 15)
+            .set_default("max_audio_size_mb", 50)?
+            .set_default("playback_timeout_secs", 30)?
+            .set_default("playback_volume", 1.0)?
             // Merge with local config file (if exists)
             .add_source(File::with_name("Speech").required(false))
             .add_source(File::with_name(&format!("{}/.config/speechd-ng/Speech", std::env::var("HOME").unwrap_or_default())).required(false))

@@ -354,6 +354,92 @@ impl SpeechService {
             settings.wyoming_auto_start,
         )
     }
+    
+    // ========== Phase 15: Streaming Media Player ==========
+    
+    /// Play audio from a URL
+    /// Returns empty string on success, error message on failure
+    #[zbus(name = "PlayAudio")]
+    async fn play_audio(&self, url: String) -> String {
+        println!("Received PlayAudio request for URL: {}", url);
+        
+        let engine = if let Ok(engine) = self.engine.lock() {
+            Some(engine.clone())
+        } else {
+            return "Error: Engine locked".to_string();
+        };
+        
+        if let Some(engine) = engine {
+            match engine.play_audio(&url).await {
+                Ok(()) => String::new(),  // Empty string = success
+                Err(e) => e,
+            }
+        } else {
+            "Error: No engine".to_string()
+        }
+    }
+    
+    /// Stop current audio playback
+    /// Returns true if something was stopped
+    #[zbus(name = "StopAudio")]
+    async fn stop_audio(&self) -> bool {
+        println!("Received StopAudio request");
+        
+        let engine = if let Ok(engine) = self.engine.lock() {
+            Some(engine.clone())
+        } else {
+            return false;
+        };
+        
+        if let Some(engine) = engine {
+            engine.stop_audio().await
+        } else {
+            false
+        }
+    }
+    
+    /// Set playback volume (0.0 - 1.0)
+    /// Returns true on success
+    #[zbus(name = "SetVolume")]
+    async fn set_volume(&self, volume: f64) -> bool {
+        println!("Received SetVolume request: {}", volume);
+        
+        let engine = if let Ok(engine) = self.engine.lock() {
+            Some(engine.clone())
+        } else {
+            return false;
+        };
+        
+        if let Some(engine) = engine {
+            engine.set_volume(volume as f32).await
+        } else {
+            false
+        }
+    }
+    
+    /// Get current volume setting (0.0 - 1.0)
+    #[zbus(name = "GetVolume")]
+    async fn get_volume(&self) -> f64 {
+        let settings = crate::config_loader::SETTINGS.read().unwrap();
+        settings.playback_volume as f64
+    }
+    
+    /// Get playback status
+    /// Returns (is_playing, current_url_or_empty)
+    #[zbus(name = "GetPlaybackStatus")]
+    async fn get_playback_status(&self) -> (bool, String) {
+        let engine = if let Ok(engine) = self.engine.lock() {
+            Some(engine.clone())
+        } else {
+            return (false, String::new());
+        };
+        
+        if let Some(engine) = engine {
+            engine.get_playback_status().await
+        } else {
+            (false, String::new())
+        }
+    }
 }
 
 #[tokio::main]

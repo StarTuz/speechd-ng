@@ -106,3 +106,11 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **Benchmarking**: Create latency/resource usage test suite.
 -   [x] **CI Hardening**: Add offline-mode verification tests.
 
+## Phase 15: Streaming Media Player (✅ Completed)
+**Goal**: Play audio from URLs directly via D-Bus.
+-   [x] **PlayAudio D-Bus Method**: Download and play audio from HTTP/HTTPS URLs.
+-   [x] **StopAudio D-Bus Method**: Cancel current audio playback.
+-   [x] **SetVolume / GetVolume**: Configurable playback volume (0.0-1.0).
+-   [x] **GetPlaybackStatus**: Query current playback state and URL.
+-   [x] **Configurable Limits**: Max file size (50MB default), download timeout.
+

@@ -187,6 +187,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Imp
 | 11 | Ignored Commands | ✅ Complete |
 | 12 | Improved VAD | ✅ Complete |
 | 14 | Hardening & Packaging | ✅ Complete |
+| 15 | Streaming Media Player | ✅ Complete |
 
 ## 🔒 Security
 

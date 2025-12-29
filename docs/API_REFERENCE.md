@@ -402,6 +402,88 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 
 ---
 
+## Streaming Media Player (Phase 15)
+
+### `PlayAudio(url: String) → String`
+
+Play audio from a URL. Downloads the audio file and plays it through the audio engine.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service PlayAudio s "https://example.com/audio.wav"
+```
+
+**Parameters:**
+- `url`: HTTP/HTTPS URL to audio file (WAV, MP3, OGG, FLAC supported)
+
+**Returns:** Empty string on success, error message on failure.
+
+**Configuration** (`~/.config/speechd-ng/Speech.toml`):
+```toml
+max_audio_size_mb = 50       # Max file size in MB
+playback_timeout_secs = 30   # Download timeout
+playback_volume = 1.0        # Default volume (0.0-1.0)
+```
+
+**Notes:**
+- Audio is fully downloaded before playback (no streaming)
+- Queues behind TTS (does not interrupt)
+- URL must start with `http://` or `https://`
+
+---
+
+### `StopAudio() → bool`
+
+Stop current audio playback.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service StopAudio
+```
+
+**Returns:** `true` if playback was stopped, `false` if nothing was playing.
+
+---
+
+### `SetVolume(volume: f64) → bool`
+
+Set the playback volume (affects both TTS and media playback).
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service SetVolume d 0.7
+```
+
+**Parameters:**
+- `volume`: Volume level from 0.0 (mute) to 1.0 (full)
+
+**Returns:** `true` on success.
+
+---
+
+### `GetVolume() → f64`
+
+Get the current playback volume setting.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service GetVolume
+```
+
+**Returns:** Current volume (0.0 - 1.0).
+
+---
+
+### `GetPlaybackStatus() → (is_playing: bool, current_url: String)`
+
+Get the current playback status.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service GetPlaybackStatus
+```
+
+**Returns:**
+- `is_playing`: Whether audio is currently playing
+- `current_url`: URL of currently playing audio (empty if not playing)
+
+---
+
 ## Python Integration Example
 
 ```python

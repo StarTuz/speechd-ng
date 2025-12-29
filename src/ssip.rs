@@ -4,13 +4,27 @@ use std::sync::{Arc, Mutex};
 use crate::engine::AudioEngine;
 
 pub async fn start_server(engine: Arc<Mutex<AudioEngine>>) {
-    // Attempt to bind to standard SSIP port
-    let listener = match TcpListener::bind("127.0.0.1:6560").await {
-        Ok(l) => l,
-        Err(e) => {
-            eprintln!("SSIP Shim: Could not bind port 6560 (Occupied?): {}", e);
-            return;
+    // Attempt to bind to standard SSIP port with retries
+    let mut retries = 5;
+    let listener = loop {
+        match TcpListener::bind("127.0.0.1:6560").await {
+            Ok(l) => break Some(l),
+            Err(e) => {
+                if retries > 0 {
+                    eprintln!("SSIP Shim: Bind failed ({}), retrying in 500ms... ({} attempts left)", e, retries);
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                    retries -= 1;
+                } else {
+                    eprintln!("SSIP Shim: Could not bind port 6560 after retries: {}", e);
+                    break None;
+                }
+            }
         }
+    };
+
+    let listener = match listener {
+        Some(l) => l,
+        None => return,
     };
     
     println!("SSIP Shim listening on 127.0.0.1:6560");

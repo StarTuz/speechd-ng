@@ -94,6 +94,7 @@ impl RateLimiter {
     }
     
     /// Get remaining tokens for a sender/type (for debugging/info)
+    #[allow(dead_code)]
     pub fn remaining(&self, sender: &str, limit_type: LimitType) -> f32 {
         let buckets = self.buckets.lock().unwrap();
         let key = (sender.to_string(), limit_type);
@@ -102,6 +103,7 @@ impl RateLimiter {
     }
     
     /// Clean up old entries (senders not seen recently)
+    #[allow(dead_code)]
     pub fn cleanup(&self, max_age_secs: u64) {
         let mut buckets = self.buckets.lock().unwrap();
         let now = Instant::now();

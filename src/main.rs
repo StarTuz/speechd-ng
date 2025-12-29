@@ -128,12 +128,12 @@ impl SpeechService {
     }
 
     #[zbus(name = "DownloadVoice")]
-    async fn download_voice(&self, #[zbus(header)] header: Header<'_>, voice_id: String) -> String {
+    async fn download_voice(&self, #[zbus(header)] header: Header<'_>, voice_id: String) -> zbus::fdo::Result<String> {
         // Polkit authorization check
         if let Some(sender) = header.sender() {
             if let Ok(pid) = SecurityAgent::get_sender_pid(&self.conn, sender.as_str()).await {
                 if let Err(e) = SecurityAgent::check_permission_polkit(pid, "org.speech.service.manage").await {
-                    return format!("Access Denied: {}", e);
+                    return Err(zbus::fdo::Error::AccessDenied(format!("Polkit denied: {}", e)));
                 }
             }
         }
@@ -146,11 +146,11 @@ impl SpeechService {
 
         if let Some(engine) = engine {
             match engine.download_voice(voice_id).await {
-                Ok(_) => "Success".to_string(),
-                Err(e) => format!("Error: {}", e),
+                Ok(_) => Ok("Success".to_string()),
+                Err(e) => Err(zbus::fdo::Error::Failed(format!("Error: {}", e))),
             }
         } else {
-             "Error: Engine locked".to_string()
+             Err(zbus::fdo::Error::Failed("Engine locked".to_string()))
         }
     }
 
@@ -259,27 +259,27 @@ impl SpeechService {
     /// Add a manual voice correction (heard -> meant)
     /// This is used when the user knows what ASR mishears
     #[zbus(name = "AddCorrection")]
-    async fn add_correction(&self, heard: String, meant: String) -> bool {
+    async fn add_correction(&self, heard: String, meant: String) -> zbus::fdo::Result<bool> {
         println!("Adding manual correction: '{}' -> '{}'", heard, meant);
-        self.fingerprint.add_manual_correction(heard, meant)
+        Ok(self.fingerprint.add_manual_correction(heard, meant))
     }
 
     /// Undo the last correction (manual or passive)
     #[zbus(name = "RollbackLastCorrection")]
-    async fn rollback_last_correction(&self) -> bool {
-        self.fingerprint.rollback_last_correction()
+    async fn rollback_last_correction(&self) -> zbus::fdo::Result<bool> {
+        Ok(self.fingerprint.rollback_last_correction())
     }
 
     /// Train a word by recording user speech and learning what ASR hears
     /// Returns (what_asr_heard, success)
     #[zbus(name = "TrainWord")]
-    async fn train_word(&self, #[zbus(header)] header: Header<'_>, expected: String, duration_secs: u32) -> (String, bool) {
+    async fn train_word(&self, #[zbus(header)] header: Header<'_>, expected: String, duration_secs: u32) -> zbus::fdo::Result<(String, bool)> {
         // Polkit authorization check
         if let Some(sender) = header.sender() {
             if let Ok(pid) = SecurityAgent::get_sender_pid(&self.conn, sender.as_str()).await {
                 if let Err(e) = SecurityAgent::check_permission_polkit(pid, "org.speech.service.train").await {
                     eprintln!("Access Denied for TrainWord: {}", e);
-                    return ("Access Denied".to_string(), false);
+                    return Err(zbus::fdo::Error::AccessDenied("Polkit denied".into()));
                 }
             }
         }
@@ -317,9 +317,9 @@ impl SpeechService {
                         engine.speak(&feedback, None);
                     }
                 }
-                (heard, success)
+                Ok((heard, success))
             },
-            Err(e) => (format!("Error: {}", e), false),
+            Err(e) => Err(zbus::fdo::Error::Failed(format!("Error: {}", e))),
         }
     }
 
@@ -330,32 +330,35 @@ impl SpeechService {
     }
 
     /// List all learned patterns (for debugging/UI)
+    /// List all learned patterns (for debugging/UI)
     #[zbus(name = "ListPatterns")]
-    async fn list_patterns(&self) -> Vec<(String, String, String)> {
-        self.fingerprint.get_all_patterns()
+    async fn list_patterns(&self) -> zbus::fdo::Result<Vec<(String, String, String)>> {
+        let patterns = self.fingerprint.get_all_patterns()
             .into_iter()
             .map(|(heard, meant, conf, source)| {
                 (heard, meant, format!("{:.0}% ({})", conf * 100.0, source))
             })
-            .collect()
+            .collect();
+        Ok(patterns)
     }
 
     // ========== Phase 10: Pattern Import/Export ==========
 
     /// Export fingerprint to a file
+    /// Export fingerprint to a file
     /// Returns true if successful
-    async fn export_fingerprint(&self, path: String) -> bool {
+    async fn export_fingerprint(&self, path: String) -> zbus::fdo::Result<bool> {
         println!("Exporting fingerprint to: {}", path);
-        self.fingerprint.export_to_path(&path)
+        Ok(self.fingerprint.export_to_path(&path))
     }
 
     /// Import fingerprint from a file
     /// If merge=true, adds new patterns without overwriting existing
     /// If merge=false, replaces current fingerprint entirely
     /// Returns total pattern count after import
-    async fn import_fingerprint(&self, path: String, merge: bool) -> u32 {
+    async fn import_fingerprint(&self, path: String, merge: bool) -> zbus::fdo::Result<u32> {
         println!("Importing fingerprint from: {} (merge={})", path, merge);
-        self.fingerprint.import_from_path(&path, merge)
+        Ok(self.fingerprint.import_from_path(&path, merge))
     }
 
     /// Get the path to the fingerprint data file
@@ -366,21 +369,21 @@ impl SpeechService {
     // ========== Phase 11: Ignored Commands Tracking ==========
 
     /// Get all ignored commands (heard, timestamp, context)
-    async fn get_ignored_commands(&self) -> Vec<(String, String, String)> {
-        self.fingerprint.get_ignored_commands()
+    async fn get_ignored_commands(&self) -> zbus::fdo::Result<Vec<(String, String, String)>> {
+        Ok(self.fingerprint.get_ignored_commands())
     }
 
     /// Clear all ignored commands
     /// Returns count of commands cleared
-    async fn clear_ignored_commands(&self) -> u32 {
-        self.fingerprint.clear_ignored_commands()
+    async fn clear_ignored_commands(&self) -> zbus::fdo::Result<u32> {
+        Ok(self.fingerprint.clear_ignored_commands())
     }
 
     /// Correct an ignored command - removes from ignored list and adds as pattern
     /// Returns true if the command was found and corrected
-    async fn correct_ignored_command(&self, heard: String, meant: String) -> bool {
+    async fn correct_ignored_command(&self, heard: String, meant: String) -> zbus::fdo::Result<bool> {
         println!("Correcting ignored command: '{}' -> '{}'", heard, meant);
-        self.fingerprint.correct_ignored_command(&heard, &meant)
+        Ok(self.fingerprint.correct_ignored_command(&heard, &meant))
     }
 
     /// Manually add a command to the ignored list (for testing/debugging)
@@ -391,31 +394,26 @@ impl SpeechService {
     // ========== Phase 13: Wyoming Protocol ==========
 
     /// Get current STT backend ("vosk" or "wyoming")
-    #[zbus(name = "GetSttBackend")]
-    async fn get_stt_backend(&self) -> String {
-        config_loader::SETTINGS.read().unwrap().stt_backend.clone()
-    }
-
     /// Returns diagnostic status: (ai_enabled, passive_threshold, stt_backend, total_patterns)
-    async fn get_status(&self) -> (bool, f32, String, u32) {
+    async fn get_status(&self) -> zbus::fdo::Result<(bool, f32, String, u32)> {
         let (ai, thresh, stt) = {
             let s = config_loader::SETTINGS.read().unwrap();
             (s.enable_ai, s.passive_confidence_threshold, s.stt_backend.clone())
         };
         
         let (m, p, _) = self.fingerprint.get_stats();
-        (ai, thresh, stt, m + p)
+        Ok((ai, thresh, stt, m + p))
     }
 
     /// Returns Wyoming connection info: (host, port, model, auto_start)
-    async fn get_wyoming_info(&self) -> (String, u16, String, bool) {
+    async fn get_wyoming_info(&self) -> zbus::fdo::Result<(String, u16, String, bool)> {
         let settings = crate::config_loader::SETTINGS.read().unwrap();
-        (
+        Ok((
             settings.wyoming_host.clone(),
             settings.wyoming_port,
             settings.wyoming_model.clone(),
             settings.wyoming_auto_start,
-        )
+        ))
     }
     
     // ========== Phase 15: Streaming Media Player ==========

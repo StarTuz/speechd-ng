@@ -123,7 +123,25 @@ impl Settings {
             // Merge with environment variables (e.g. SPEECH_OLLAMA_URL)
             .add_source(config::Environment::with_prefix("SPEECH"));
 
-        builder.build()?.try_deserialize()
+        let settings: Settings = builder.build()?.try_deserialize()?;
+        settings.validate()?;
+        Ok(settings)
+    }
+
+    pub fn validate(&self) -> Result<(), config::ConfigError> {
+        if self.playback_volume < 0.0 || self.playback_volume > 1.0 {
+            return Err(config::ConfigError::Message(format!(
+                "Invalid playback_volume: {}. Must be between 0.0 and 1.0",
+                self.playback_volume
+            )));
+        }
+        if self.memory_size == 0 {
+             return Err(config::ConfigError::Message("memory_size must be greater than 0".to_string()));
+        }
+        if self.vad_speech_threshold <= 0 {
+             return Err(config::ConfigError::Message("vad_speech_threshold must be positive".to_string()));
+        }
+        Ok(())
     }
 }
 #[cfg(test)]

@@ -193,6 +193,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Imp
 | 16c | 5.1 Surround Support | ✅ Complete |
 | 17a | Polkit Enforcement | ✅ Complete |
 | 17b | Rate Limiting | ✅ Complete |
+| 18 | System Hardening | ✅ Complete |
 
 ## 🔒 Security
 

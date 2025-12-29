@@ -440,6 +440,64 @@ impl SpeechService {
             (false, String::new())
         }
     }
+    
+    // ========== Phase 16: Multi-Channel Audio ==========
+    
+    /// Speak text to a specific audio channel
+    /// channel: "left", "right", "center", or "stereo" (default)
+    /// Returns true on success
+    #[zbus(name = "SpeakChannel")]
+    async fn speak_channel(&self, text: String, voice: String, channel: String) -> bool {
+        println!("Received SpeakChannel: '{}' -> {} (channel: {})", text, voice, channel);
+        
+        let audio_enabled = config_loader::SETTINGS.read()
+            .map(|s| s.enable_audio)
+            .unwrap_or(true);
+        
+        if audio_enabled {
+            if let Ok(engine) = self.engine.lock() {
+                let voice_opt = if voice.is_empty() { None } else { Some(voice) };
+                engine.speak_channel(&text, voice_opt, &channel);
+                return true;
+            }
+        }
+        false
+    }
+    
+    /// Play audio from URL to a specific channel
+    /// channel: "left", "right", "center", or "stereo"
+    /// Returns empty string on success, error message on failure
+    #[zbus(name = "PlayAudioChannel")]
+    async fn play_audio_channel(&self, url: String, channel: String) -> String {
+        println!("Received PlayAudioChannel: {} -> {}", url, channel);
+        
+        let engine = if let Ok(engine) = self.engine.lock() {
+            Some(engine.clone())
+        } else {
+            return "Error: Engine locked".to_string();
+        };
+        
+        if let Some(engine) = engine {
+            match engine.play_audio_channel(&url, &channel).await {
+                Ok(()) => String::new(),
+                Err(e) => e,
+            }
+        } else {
+            "Error: No engine".to_string()
+        }
+    }
+    
+    /// List available audio channels
+    /// Returns list of (channel_name, description) tuples
+    #[zbus(name = "ListChannels")]
+    async fn list_channels(&self) -> Vec<(String, String)> {
+        vec![
+            ("left".to_string(), "Left speaker/ear only".to_string()),
+            ("right".to_string(), "Right speaker/ear only".to_string()),
+            ("center".to_string(), "Both at 70% (mono-like)".to_string()),
+            ("stereo".to_string(), "Full stereo (default)".to_string()),
+        ]
+    }
 }
 
 #[tokio::main]

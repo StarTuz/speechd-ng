@@ -114,3 +114,11 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **GetPlaybackStatus**: Query current playback state and URL.
 -   [x] **Configurable Limits**: Max file size (50MB default), download timeout.
 
+## Phase 16a: Multi-Channel Audio (✅ Completed)
+**Goal**: Route audio to different stereo channels for aviation/gaming use cases.
+-   [x] **SpeakChannel D-Bus Method**: Speak to left, right, center, or stereo.
+-   [x] **PlayAudioChannel D-Bus Method**: Play URL audio to specific channel.
+-   [x] **ListChannels D-Bus Method**: List available channel options.
+-   [x] **Use Case: Aviation**: COM1 to left ear, COM2 to right ear.
+-   [x] **Use Case: Gaming**: Voice chat vs game audio separation.
+

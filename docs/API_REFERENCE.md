@@ -484,6 +484,59 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 
 ---
 
+## Multi-Channel Audio (Phase 16a)
+
+### `SpeakChannel(text: String, voice: String, channel: String) → bool`
+
+Speak text to a specific audio channel. Use for COM1/COM2 separation in aviation, or voice routing in gaming.
+
+```bash
+# Speak to left ear only (COM1)
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service SpeakChannel sss "Tower, ready for takeoff" "" "left"
+
+# Speak to right ear only (COM2)
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service SpeakChannel sss "ATIS information alpha" "" "right"
+```
+
+**Parameters:**
+- `text`: Text to speak
+- `voice`: Voice ID (empty for default)
+- `channel`: `"left"`, `"right"`, `"center"`, or `"stereo"`
+
+**Returns:** `true` on success.
+
+---
+
+### `PlayAudioChannel(url: String, channel: String) → String`
+
+Play audio from URL to a specific channel.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service PlayAudioChannel ss "https://example.com/atc.wav" "left"
+```
+
+**Returns:** Empty string on success, error message on failure.
+
+---
+
+### `ListChannels() → Vec<(name: String, description: String)>`
+
+List available audio channels.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service ListChannels
+```
+
+**Returns:**
+| Channel | Description |
+|---------|-------------|
+| `left` | Left speaker/ear only |
+| `right` | Right speaker/ear only |
+| `center` | Both at 70% (mono-like) |
+| `stereo` | Full stereo (default) |
+
+---
+
 ## Python Integration Example
 
 ```python

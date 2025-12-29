@@ -2,9 +2,9 @@
 
 ## Current Context
 
-We have completed **Phase 15** of the roadmap. **SpeechD-NG v0.3.0** is now a fully-featured, self-improving, hands-free speech assistant with **streaming media playback** capabilities.
+We have completed **Phase 16a** of the roadmap. **SpeechD-NG v0.4.0** now includes **multi-channel audio** for aviation and gaming use cases.
 
-## Status: All Phases Completed (1-15)
+## Status: All Phases Completed (1-16a)
 
 ### Completed Phases
 
@@ -15,6 +15,7 @@ We have completed **Phase 15** of the roadmap. **SpeechD-NG v0.3.0** is now a fu
 | 13 | Wyoming Protocol (Remote ASR) | ✅ |
 | 14 | Hardening & Packaging | ✅ |
 | 15 | Streaming Media Player | ✅ |
+| 16a | Multi-Channel Audio (Stereo Panning) | ✅ |
 
 ## Functional Features
 
@@ -55,6 +56,11 @@ We have completed **Phase 15** of the roadmap. **SpeechD-NG v0.3.0** is now a fu
 - `StopAudio()` - Stop current playback
 - `SetVolume(volume)` / `GetVolume()` - Volume control (0.0-1.0)
 - `GetPlaybackStatus()` - Get (is_playing, current_url)
+
+**Multi-Channel Audio (Phase 16a):**
+- `SpeakChannel(text, voice, channel)` - Speak to left/right/center/stereo channel
+- `PlayAudioChannel(url, channel)` - Play URL to specific channel
+- `ListChannels()` - Get available channels
 
 ### Service Details
 | Property | Value |

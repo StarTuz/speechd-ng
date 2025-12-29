@@ -19,6 +19,9 @@ enum AudioMessage {
     StopAudio(oneshot::Sender<bool>),                        // Returns true if stopped
     SetVolume(f32, oneshot::Sender<bool>),                   // (volume 0.0-1.0, success)
     GetPlaybackStatus(oneshot::Sender<(bool, String)>),      // (is_playing, current_url)
+    // Phase 16: Multi-Channel Audio
+    SpeakChannel(String, Option<String>, String, Option<oneshot::Sender<()>>),  // (text, voice, channel, complete)
+    PlayAudioChannel(String, String, oneshot::Sender<Result<(), String>>),      // (url, channel, response)
 }
 
 #[derive(Clone)]
@@ -307,6 +310,182 @@ impl AudioEngine {
                         let url = current_url.clone().unwrap_or_default();
                         let _ = resp_tx.send((is_playing, url));
                     },
+                    
+                    // ========== Phase 16: Multi-Channel Audio ==========
+                    AudioMessage::SpeakChannel(text, voice, channel, complete_tx) => {
+                        let (piper_model, default_backend) = {
+                            let s = crate::config_loader::SETTINGS.read().unwrap();
+                            (s.piper_model.clone(), s.tts_backend.clone())
+                        };
+
+                        // Determine backend and voice
+                        let (target_backend_id, actual_voice) = if let Some(ref v) = voice {
+                            if v.starts_with("piper:") {
+                                ("piper", Some(&v[6..]))
+                            } else if v.starts_with("espeak:") {
+                                ("espeak", Some(&v[7..]))
+                            } else {
+                                (default_backend.as_str(), Some(v.as_str()))
+                            }
+                        } else {
+                            (default_backend.as_str(), None)
+                        };
+
+                        if let Some(backend) = backends.get(target_backend_id) {
+                            let raw_voice = if target_backend_id == "piper" && actual_voice.is_none() {
+                                Some(piper_model.as_str())
+                            } else {
+                                actual_voice
+                            };
+
+                            let voice_id = raw_voice.map(|v| {
+                                if v.starts_with("piper:") { &v[6..] }
+                                else if v.starts_with("espeak:") { &v[7..] }
+                                else { v }
+                            });
+
+                            println!("Audio Thread: SpeakChannel '{}' to {} (voice: {:?}, channel: {})", 
+                                text, target_backend_id, voice_id, channel);
+
+                            match backend.synthesize(&text, voice_id) {
+                                Ok(audio_data) => {
+                                    if let Some(ref handle) = stream_handle {
+                                        let cursor = Cursor::new(audio_data);
+                                        match Sink::try_new(handle) {
+                                            Ok(sink) => {
+                                                match Decoder::new(cursor) {
+                                                    Ok(source) => {
+                                                        use rodio::Source;
+                                                        use rodio::source::ChannelVolume;
+                                                        
+                                                        // Get channel volumes for L/R stereo output
+                                                        // ChannelVolume makes mono and routes to specified channels
+                                                        let channel_vols: Vec<f32> = match channel.to_lowercase().as_str() {
+                                                            "left" => vec![current_volume, 0.0],  // Left only
+                                                            "right" => vec![0.0, current_volume], // Right only
+                                                            "center" => vec![current_volume * 0.7, current_volume * 0.7], // Both
+                                                            _ => vec![current_volume, current_volume], // Full stereo
+                                                        };
+                                                        
+                                                        println!("Audio Thread: Playing to channel '{}' (L:{:.2}, R:{:.2})", 
+                                                            channel, channel_vols[0], channel_vols[1]);
+                                                        
+                                                        // Wrap source with ChannelVolume for true L/R separation
+                                                        let panned = ChannelVolume::new(
+                                                            source.convert_samples::<f32>(),
+                                                            channel_vols
+                                                        );
+                                                        
+                                                        sink.append(panned);
+                                                        sink.sleep_until_end();
+                                                    }
+                                                    Err(e) => eprintln!("Failed to decode: {}", e),
+                                                }
+                                            }
+                                            Err(e) => eprintln!("Failed to create sink: {}", e),
+                                        }
+                                    }
+                                }
+                                Err(e) => eprintln!("Backend {} error: {}", target_backend_id, e),
+                            }
+                        }
+                        if let Some(tx) = complete_tx {
+                            let _ = tx.send(());
+                        }
+                    },
+                    
+                    AudioMessage::PlayAudioChannel(url, channel, resp_tx) => {
+                        println!("Audio Thread: PlayAudioChannel {} to {}", url, channel);
+                        
+                        if !url.starts_with("http://") && !url.starts_with("https://") {
+                            let _ = resp_tx.send(Err("Invalid URL: must start with http:// or https://".to_string()));
+                            continue;
+                        }
+                        
+                        let (max_size_bytes, timeout_secs) = {
+                            let s = crate::config_loader::SETTINGS.read().unwrap();
+                            (s.max_audio_size_mb * 1024 * 1024, s.playback_timeout_secs)
+                        };
+                        
+                        let client = match reqwest::blocking::Client::builder()
+                            .timeout(std::time::Duration::from_secs(timeout_secs))
+                            .build()
+                        {
+                            Ok(c) => c,
+                            Err(e) => {
+                                let _ = resp_tx.send(Err(format!("HTTP client error: {}", e)));
+                                continue;
+                            }
+                        };
+                        
+                        match client.get(&url).send() {
+                            Ok(response) => {
+                                if !response.status().is_success() {
+                                    let _ = resp_tx.send(Err(format!("HTTP error: {}", response.status())));
+                                    continue;
+                                }
+                                
+                                if let Some(len) = response.content_length() {
+                                    if len > max_size_bytes {
+                                        let _ = resp_tx.send(Err(format!("Audio too large: {} bytes", len)));
+                                        continue;
+                                    }
+                                }
+                                
+                                match response.bytes() {
+                                    Ok(audio_data) => {
+                                        if let Some(ref handle) = stream_handle {
+                                            let cursor = Cursor::new(audio_data.to_vec());
+                                            match Sink::try_new(handle) {
+                                                Ok(sink) => {
+                                                    match Decoder::new(cursor) {
+                                                        Ok(source) => {
+                                                            use rodio::Source;
+                                                            use rodio::source::ChannelVolume;
+                                                            
+                                                            // Get channel volumes for L/R stereo output
+                                                            let channel_vols: Vec<f32> = match channel.to_lowercase().as_str() {
+                                                                "left" => vec![current_volume, 0.0],
+                                                                "right" => vec![0.0, current_volume],
+                                                                "center" => vec![current_volume * 0.7, current_volume * 0.7],
+                                                                _ => vec![current_volume, current_volume],
+                                                            };
+                                                            
+                                                            println!("Audio Thread: Playing URL to channel '{}' (L:{:.2}, R:{:.2})", 
+                                                                channel, channel_vols[0], channel_vols[1]);
+                                                            
+                                                            let panned = ChannelVolume::new(
+                                                                source.convert_samples::<f32>(),
+                                                                channel_vols
+                                                            );
+                                                            
+                                                            sink.append(panned);
+                                                            let _ = resp_tx.send(Ok(()));
+                                                            sink.sleep_until_end();
+                                                        }
+                                                        Err(e) => {
+                                                            let _ = resp_tx.send(Err(format!("Decode error: {}", e)));
+                                                        }
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    let _ = resp_tx.send(Err(format!("Sink error: {}", e)));
+                                                }
+                                            }
+                                        } else {
+                                            let _ = resp_tx.send(Ok(()));
+                                        }
+                                    }
+                                    Err(e) => {
+                                        let _ = resp_tx.send(Err(format!("Read error: {}", e)));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                let _ = resp_tx.send(Err(format!("Fetch error: {}", e)));
+                            }
+                        }
+                    },
                 }
             }
         });
@@ -374,5 +553,40 @@ impl AudioEngine {
         let (tx, rx) = oneshot::channel();
         let _ = self.tx.send(AudioMessage::GetPlaybackStatus(tx));
         rx.await.unwrap_or((false, String::new()))
+    }
+    
+    // ========== Phase 16: Multi-Channel Audio ==========
+    
+    /// Speak text to a specific channel (left, right, center, or stereo)
+    pub fn speak_channel(&self, text: &str, voice: Option<String>, channel: &str) {
+        let _ = self.tx.send(AudioMessage::SpeakChannel(
+            text.to_string(), 
+            voice, 
+            channel.to_string(), 
+            None
+        ));
+    }
+    
+    /// Speak text to a specific channel and wait for completion
+    pub async fn speak_channel_blocking(&self, text: &str, voice: Option<String>, channel: &str) {
+        let (tx, rx) = oneshot::channel();
+        let _ = self.tx.send(AudioMessage::SpeakChannel(
+            text.to_string(), 
+            voice, 
+            channel.to_string(), 
+            Some(tx)
+        ));
+        let _ = rx.await;
+    }
+    
+    /// Play audio from URL to a specific channel
+    pub async fn play_audio_channel(&self, url: &str, channel: &str) -> Result<(), String> {
+        let (tx, rx) = oneshot::channel();
+        let _ = self.tx.send(AudioMessage::PlayAudioChannel(
+            url.to_string(), 
+            channel.to_string(), 
+            tx
+        ));
+        rx.await.map_err(|_| "Audio thread crashed".to_string())?
     }
 }

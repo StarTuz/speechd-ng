@@ -484,24 +484,52 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 
 ---
 
-## Multi-Channel Audio (Phase 16a)
+## Rate Limiting (Phase 17b)
+
+To prevent abuse, the daemon enforces rate limits per D-Bus sender. 
+
+| Method Type | Default Limit | Protected Methods |
+|-------------|---------------|-------------------|
+| **TTS** | 30/min | `Speak`, `SpeakVoice`, `SpeakChannel` |
+| **AI** | 10/min | `Think` |
+| **Audio** | 20/min | `PlayAudio`, `PlayAudioChannel` |
+| **Listen** | 30/min | `Listen`, `ListenVad` |
+
+**Behavior:**
+- If the limit is exceeded, the method returns a **D-Bus Error**: `org.freedesktop.DBus.Error.Failed: Rate limited`.
+- A log entry is created: `Rate limited: <Type> for sender :1.xxxx`.
+
+---
+
+## Multi-Channel Audio (Phase 16a/16c)
 
 ### `SpeakChannel(text: String, voice: String, channel: String) → bool`
 
-Speak text to a specific audio channel. Use for COM1/COM2 separation in aviation, or voice routing in gaming.
+Speak text to a specific audio channel. Supports Stereo (2ch) and 5.1 Surround (6ch).
 
 ```bash
-# Speak to left ear only (COM1)
-busctl --user call org.speech.Service /org/speech/Service org.speech.Service SpeakChannel sss "Tower, ready for takeoff" "" "left"
+# Speak to left ear only (Stereo)
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service SpeakChannel sss "Tower, left ear" "" "left"
 
-# Speak to right ear only (COM2)
-busctl --user call org.speech.Service /org/speech/Service org.speech.Service SpeakChannel sss "ATIS information alpha" "" "right"
+# Speak to Rear Left (5.1 Surround)
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service SpeakChannel sss "Traffic behind you" "" "rear-left"
 ```
 
 **Parameters:**
 - `text`: Text to speak
 - `voice`: Voice ID (empty for default)
-- `channel`: `"left"`, `"right"`, `"center"`, or `"stereo"`
+- `channel`: Target channel identifier (case-insensitive)
+
+| Channel Key | Description | Output Mode |
+|-------------|-------------|-------------|
+| `left`, `front-left` | Left Channel | Stereo (2ch) |
+| `right`, `front-right` | Right Channel | Stereo (2ch) |
+| `center` | Phantom Center (70% L/R) | Stereo (2ch) |
+| `stereo` | Full Stereo | Stereo (2ch) |
+| `rear-left` | Surround Left | Surround (5.1) |
+| `rear-right` | Surround Right | Surround (5.1) |
+| `center-real` | Discrete Center | Surround (5.1) |
+| `lfe`, `subwoofer` | LFE / Sub | Surround (5.1) |
 
 **Returns:** `true` on success.
 
@@ -509,10 +537,10 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Spe
 
 ### `PlayAudioChannel(url: String, channel: String) → String`
 
-Play audio from URL to a specific channel.
+Play audio from URL to a specific channel. Supports same channel keys as `SpeakChannel`.
 
 ```bash
-busctl --user call org.speech.Service /org/speech/Service org.speech.Service PlayAudioChannel ss "https://example.com/atc.wav" "left"
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service PlayAudioChannel ss "https://example.com/siren.wav" "lfe"
 ```
 
 **Returns:** Empty string on success, error message on failure.
@@ -521,19 +549,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Pla
 
 ### `ListChannels() → Vec<(name: String, description: String)>`
 
-List available audio channels.
-
-```bash
-busctl --user call org.speech.Service /org/speech/Service org.speech.Service ListChannels
-```
-
-**Returns:**
-| Channel | Description |
-|---------|-------------|
-| `left` | Left speaker/ear only |
-| `right` | Right speaker/ear only |
-| `center` | Both at 70% (mono-like) |
-| `stereo` | Full stereo (default) |
+List available audio channels configurations.
 
 ---
 
@@ -692,12 +708,12 @@ fn main() -> zbus::Result<()> {
 
 ## Error Handling
 
-Most methods return meaningful error values:
-- `bool` methods return `false` on failure
-- `String` methods return error messages like `"Error: <details>"`
-- Empty arrays indicate no data
+- **Rate Limits**: Return `org.freedesktop.DBus.Error.Failed` (Message: "Rate limited").
+- **Permissions**: Return `org.freedesktop.DBus.Error.AccessDenied` (Message: "Polkit denied").
+- **Logic Errors**: `bool` methods return `false`, `String` methods return `"Error: <details>"`.
+- **Empty Data**: Empty arrays indicate no data found.
 
-The service logs detailed errors to journald:
+The service logs detailed errors to journald for debugging:
 ```bash
 journalctl --user -u speechd-ng -f
 ```
@@ -706,10 +722,14 @@ journalctl --user -u speechd-ng -f
 
 ## Security Notes
 
-1. **Polkit Authorization**: Methods like `DownloadVoice`, `TrainWord`, and `Think` check Polkit permissions.
-2. **Systemd Sandboxing**: The service runs with strict filesystem restrictions.
-3. **Export Paths**: Only certain directories are writable (see `ExportFingerprint`).
+1. **Polkit Authorization**: Sensitive methods check permissions via `zbus_polkit`.
+   - `DownloadVoice`, `TrainWord`, `Think`, `Listen`: Require `org.speech.service.*` privileges.
+   - **Active Desktop**: Typically auto-allowed.
+   - **Remote/SSH**: Requires admin authentication.
+2. **Rate Limiting**: Enforced per sender unique name (e.g., `:1.55`) to prevent DoS.
+3. **Systemd Sandboxing**: The service runs with strict filesystem restrictions (`ProtectSystem=strict`, `ProtectHome=read-only`).
+4. **Export Paths**: Only specific directories are writable (e.g., `~/.local/share/speechd-ng/`).
 
 ---
 
-*Last Updated: 2025-12-28*
+*Last Updated: 2025-12-29 (v0.7.1)*

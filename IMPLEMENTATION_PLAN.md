@@ -251,16 +251,5 @@ cat src/fingerprint.rs
 
 ---
 
-## Phase 16: Multi-Channel Support (TBD)
-
-**Goal**: Support directed audio output for aviation headsets (COM1 vs COM2 separation).
-
-**Value**: High (for flight sim) | **Effort**: Medium
-
-### Requirements
-- `SpeakChannel(text: String, voice: String, channel: String)`
-- `channel` options: "default", "left", "right", "headset", "speakers"
-
----
 
 *Last Updated: 2025-12-29*

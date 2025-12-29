@@ -498,6 +498,152 @@ impl SpeechService {
             ("stereo".to_string(), "Full stereo (default)".to_string()),
         ]
     }
+    
+    // ========== Phase 16b: PipeWire Device Routing ==========
+    
+    /// List available PipeWire audio sinks
+    /// Returns list of (id, name, description, is_default) tuples
+    #[zbus(name = "ListSinks")]
+    async fn list_sinks(&self) -> Vec<(u32, String, String, bool)> {
+        // Parse wpctl status output to get sinks
+        match std::process::Command::new("/usr/bin/wpctl")
+            .arg("status")
+            .output()
+        {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                
+                // Debug logging
+                if stdout.is_empty() {
+                    eprintln!("ListSinks: wpctl returned empty stdout, stderr: {}", stderr);
+                }
+                
+                let mut sinks = Vec::new();
+                let mut in_sinks_section = false;
+                
+                for line in stdout.lines() {
+                    // Check for Sinks section start (with box-drawing chars)
+                    if line.contains("Sinks:") && !line.contains("Sources:") {
+                        in_sinks_section = true;
+                        continue;
+                    }
+                    if in_sinks_section {
+                        // End of sinks section - Sources line or empty sink line
+                        if line.contains("Sources:") || line.contains("Streams:") || 
+                           line.contains("Filters:") {
+                            break;
+                        }
+                        
+                        // Skip empty or header lines
+                        if !line.contains("[vol:") && !line.contains(".") {
+                            continue;
+                        }
+                        
+                        // Parse sink line: " │  *   68. SB Omni Surround 5.1 [vol: 1.00]"
+                        let is_default = line.contains("*");
+                        
+                        // Strip box-drawing characters and whitespace
+                        let cleaned: String = line.chars()
+                            .filter(|c| !['│', '├', '└', '─', '┬', '┤', '┴', '┼'].contains(c))
+                            .collect();
+                        let trimmed = cleaned.trim().trim_start_matches('*').trim();
+                        
+                        // Find number before first dot
+                        if let Some(dot_pos) = trimmed.find('.') {
+                            if let Ok(id) = trimmed[..dot_pos].trim().parse::<u32>() {
+                                let rest = trimmed[dot_pos + 1..].trim();
+                                // Extract name before [vol:
+                                let name = if let Some(vol_pos) = rest.find("[vol:") {
+                                    rest[..vol_pos].trim()
+                                } else {
+                                    rest
+                                };
+                                
+                                if !name.is_empty() {
+                                    sinks.push((id, name.to_string(), name.to_string(), is_default));
+                                }
+                            }
+                        }
+                    }
+                }
+                sinks
+            }
+            Err(e) => {
+                eprintln!("Failed to run wpctl: {}", e);
+                Vec::new()
+            }
+        }
+    }
+    
+    /// Speak text to a specific PipeWire device by ID
+    /// First sets the device as default, speaks, then optionally restores
+    /// Returns true on success
+    #[zbus(name = "SpeakToDevice")]
+    async fn speak_to_device(&self, text: String, voice: String, device_id: u32) -> bool {
+        println!("Received SpeakToDevice: '{}' -> device {}", text, device_id);
+        
+        // Get current default sink to restore later
+        let current_default = std::process::Command::new("/usr/bin/wpctl")
+            .args(["inspect", "@DEFAULT_AUDIO_SINK@"])
+            .output()
+            .ok()
+            .and_then(|o| {
+                let stdout = String::from_utf8_lossy(&o.stdout);
+                // Extract id from output
+                stdout.lines()
+                    .find(|l| l.trim().starts_with("id"))
+                    .and_then(|l| l.split_whitespace().nth(1))
+                    .and_then(|s| s.trim_matches(',').parse::<u32>().ok())
+            });
+        
+        // Set target device as default
+        let set_result = std::process::Command::new("/usr/bin/wpctl")
+            .args(["set-default", &device_id.to_string()])
+            .status();
+        
+        if set_result.is_err() || !set_result.unwrap().success() {
+            eprintln!("Failed to set default sink to {}", device_id);
+            return false;
+        }
+        
+        // Speak
+        let audio_enabled = config_loader::SETTINGS.read()
+            .map(|s| s.enable_audio)
+            .unwrap_or(true);
+        
+        if audio_enabled {
+            if let Ok(engine) = self.engine.lock() {
+                let voice_opt = if voice.is_empty() { None } else { Some(voice) };
+                // Use blocking speak to ensure audio completes before restoring default
+                engine.speak(&text, voice_opt);
+            }
+        }
+        
+        // Wait a moment for audio to start playing through the new device
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        
+        // Restore previous default if we had one
+        if let Some(prev_id) = current_default {
+            let _ = std::process::Command::new("/usr/bin/wpctl")
+                .args(["set-default", &prev_id.to_string()])
+                .status();
+        }
+        
+        true
+    }
+    
+    /// Get the current default audio sink
+    /// Returns (id, name) or (0, "") if not found
+    #[zbus(name = "GetDefaultSink")]
+    async fn get_default_sink(&self) -> (u32, String) {
+        // Find the default sink from ListSinks
+        let sinks = self.list_sinks().await;
+        sinks.into_iter()
+            .find(|(_, _, _, is_default)| *is_default)
+            .map(|(id, name, _, _)| (id, name))
+            .unwrap_or((0, String::new()))
+    }
 }
 
 #[tokio::main]

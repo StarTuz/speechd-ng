@@ -16,6 +16,7 @@ We have completed **Phase 16a** of the roadmap. **SpeechD-NG v0.4.0** now includ
 | 14 | Hardening & Packaging | ✅ |
 | 15 | Streaming Media Player | ✅ |
 | 16a | Multi-Channel Audio (Stereo Panning) | ✅ |
+| 16b | PipeWire Device Routing | ✅ |
 
 ## Functional Features
 
@@ -61,6 +62,11 @@ We have completed **Phase 16a** of the roadmap. **SpeechD-NG v0.4.0** now includ
 - `SpeakChannel(text, voice, channel)` - Speak to left/right/center/stereo channel
 - `PlayAudioChannel(url, channel)` - Play URL to specific channel
 - `ListChannels()` - Get available channels
+
+**PipeWire Device Routing (Phase 16b):**
+- `ListSinks()` - List available audio output devices
+- `GetDefaultSink()` - Get current default sink
+- `SpeakToDevice(text, voice, device_id)` - Route TTS to specific device
 
 ### Service Details
 | Property | Value |

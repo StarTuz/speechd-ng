@@ -122,3 +122,11 @@ This document outlines the strategic phases for SpeechD-NG development.
 -   [x] **Use Case: Aviation**: COM1 to left ear, COM2 to right ear.
 -   [x] **Use Case: Gaming**: Voice chat vs game audio separation.
 
+## Phase 16b: PipeWire Device Routing (✅ Completed)
+**Goal**: Route audio to specific PipeWire output devices.
+-   [x] **ListSinks D-Bus Method**: Enumerate available audio sinks.
+-   [x] **GetDefaultSink D-Bus Method**: Get current default sink.
+-   [x] **SpeakToDevice D-Bus Method**: Route TTS to specific device by ID.
+-   [x] **Use Case: Multi-device**: Headset for voice, speakers for ambient.
+-   [x] **Use Case: Home Automation**: Announce to kitchen vs living room.
+

@@ -537,6 +537,49 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Lis
 
 ---
 
+## PipeWire Device Routing (Phase 16b)
+
+### `ListSinks() → Vec<(id: u32, name: String, desc: String, is_default: bool)>`
+
+List available PipeWire audio output devices.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service ListSinks
+# Returns: a(ussb) 1 68 "SB Omni Surround 5.1" "SB Omni Surround 5.1" true
+```
+
+---
+
+### `GetDefaultSink() → (id: u32, name: String)`
+
+Get the current default audio sink.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service GetDefaultSink
+# Returns: us 68 "SB Omni Surround 5.1 Analog Surround 5.1"
+```
+
+---
+
+### `SpeakToDevice(text: String, voice: String, device_id: u32) → bool`
+
+Speak text to a specific PipeWire device by ID. Temporarily sets the device as default, speaks, then restores.
+
+```bash
+# Get available sinks first
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service ListSinks
+
+# Speak to device 68 (SB Omni)
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service SpeakToDevice ssu "Hello headset" "" 50
+
+# Speak to device 50 (G533 Headset)
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service SpeakToDevice ssu "Hello speakers" "" 68
+```
+
+**Returns:** `true` on success.
+
+---
+
 ## Python Integration Example
 
 ```python

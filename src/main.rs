@@ -399,6 +399,22 @@ impl SpeechService {
         Ok(config_loader::SETTINGS.read().unwrap().stt_backend.clone())
     }
 
+    /// Check if the Wyoming server is reachable
+    /// Returns (is_reachable, message)
+    #[zbus(name = "CheckWyomingHealth")]
+    async fn check_wyoming_health(&self) -> (bool, String) {
+        let (host, port) = {
+            let settings = crate::config_loader::SETTINGS.read().unwrap();
+            (settings.wyoming_host.clone(), settings.wyoming_port)
+        };
+
+        let addr = format!("{}:{}", host, port);
+        match tokio::net::TcpStream::connect(&addr).await {
+            Ok(_) => (true, format!("Successfully connected to Wyoming at {}", addr)),
+            Err(e) => (false, format!("Failed to connect to Wyoming at {}: {}", addr, e)),
+        }
+    }
+
     /// Returns diagnostic status: (ai_enabled, passive_threshold, stt_backend, total_patterns)
     async fn get_status(&self) -> zbus::fdo::Result<(bool, f32, String, u32)> {
         let (ai, thresh, stt) = {

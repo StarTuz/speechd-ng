@@ -1,5 +1,5 @@
 Name:           speechserverdaemon
-Version:        0.2.0
+Version:        0.7.2
 Release:        1%{?dist}
 Summary:        Next-generation Linux speech daemon with AI integration
 

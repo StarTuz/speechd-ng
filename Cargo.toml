@@ -1,6 +1,6 @@
 [package]
 name = "speechserverdaemon"
-version = "0.7.1"
+version = "0.7.2"
 edition = "2021"
 authors = ["StarTuz <startuz@example.com>"]
 description = "A modern, secure, next-generation speech server for Linux written in Rust."

@@ -32,7 +32,10 @@ try:
     from wyoming.audio import AudioStart, AudioChunk, AudioStop
     from wyoming.asr import Transcript
 except ImportError:
-    print("ERROR: Wyoming not installed. Run: pip install wyoming", file=sys.stderr)
+    print("ERROR: Wyoming protocol library not found.", file=sys.stderr)
+    print("Please install the 'wyoming' package (or 'wyoming-faster-whisper' which includes it):", file=sys.stderr)
+    print("  - pip:  pip install wyoming", file=sys.stderr)
+    print("  - Arch: pacman -S python-wyoming (AUR) or use a venv", file=sys.stderr)
     sys.exit(1)
 
 

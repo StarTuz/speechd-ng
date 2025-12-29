@@ -529,7 +529,15 @@ impl Ear {
         };
 
         match stt_backend.as_str() {
-            "wyoming" => self.transcribe_wyoming(path),
+            "wyoming" => {
+                match self.transcribe_wyoming(path) {
+                    Ok(text) => Ok(text),
+                    Err(e) => {
+                        eprintln!("Ear: Wyoming backend failed: {}. Falling back to Vosk.", e);
+                        self.transcribe_vosk(path)
+                    }
+                }
+            },
             _ => self.transcribe_vosk(path),
         }
     }
@@ -626,9 +634,10 @@ impl Ear {
         let stderr = String::from_utf8_lossy(&output.stderr);
         if !stderr.is_empty() {
             println!("Ear: [Wyoming] Bridge stderr: {}", stderr);
+            return Err(format!("Bridge error: {}", stderr));
         }
 
-        Err("Wyoming transcription failed".to_string())
+        Err("Wyoming transcription failed (unknown error)".to_string())
     }
 }
 

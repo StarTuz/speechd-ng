@@ -24,6 +24,7 @@ We have completed **Phase 16a** of the roadmap. **SpeechD-NG v0.4.0** now includ
 
 ## Release Artifacts
 All release packages are collected in the `dist/` directory:
+- **Master Archive**: `dist/speechd-ng-v0.7.1.tar.gz` (Includes installer + all packages)
 - **Debian**: `dist/speechserverdaemon_0.7.1-1_amd64.deb`
 - **RPM**: `dist/speechserverdaemon-0.7.1-1.x86_64.rpm`
 - **Flatpak**: `dist/org.speech.Service-0.7.1.flatpak`

@@ -43,6 +43,10 @@ cargo build --release
 ### Installation
 
 ```bash
+# Quick Install (Recommended)
+./install.sh
+
+# Manual Installation
 # Copy binary
 cp target/release/speechserverdaemon ~/.local/bin/
 
@@ -194,6 +198,8 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Imp
 | 17a | Polkit Enforcement | ✅ Complete |
 | 17b | Rate Limiting | ✅ Complete |
 | 18 | System Hardening | ✅ Complete |
+| 19 | Packaging (.deb, .rpm, .flatpak) | ✅ Complete |
+| 20 | Installer Script | ✅ Complete |
 
 ## 🔒 Security
 

@@ -55,6 +55,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Spe
 ```
 
 **Python Example:**
+
 ```python
 import dbus
 
@@ -75,6 +76,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Spe
 ```
 
 **Parameters:**
+
 - `text`: Text to speak
 - `voice`: Voice ID (e.g., `en_US-lessac-medium`, `en_GB-jenny_dioco-medium`)
 
@@ -151,12 +153,14 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Lis
 **Returns:** Transcribed text.
 
 **Notes:**
+
 - Waits for speech to begin (doesn't record initial silence)
 - Automatically ends when user stops speaking
 - Uses configurable energy thresholds
 - More natural than fixed-duration recording
 
 **Configuration** (`~/.config/speechd-ng/Speech.toml`):
+
 ```toml
 vad_speech_threshold = 500      # Energy level to detect speech start
 vad_silence_threshold = 400     # Energy level to detect silence
@@ -177,6 +181,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Add
 ```
 
 **Parameters:**
+
 - `heard`: What ASR incorrectly transcribes
 - `meant`: What the user actually said
 
@@ -207,14 +212,17 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Tra
 ```
 
 **Parameters:**
+
 - `expected`: What the user intends to say
 - `duration_secs`: Recording duration in seconds
 
-**Returns:** 
+**Returns:**
+
 - `heard`: What ASR transcribed
 - `success`: Whether the pattern was learned
 
 **Notes:**
+
 - Speaks confirmation: "I heard X. I'll remember that means Y."
 - Useful for training proper nouns and unusual words
 
@@ -242,6 +250,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 ```
 
 **Returns:**
+
 - `manual_count`: Patterns from manual training
 - `passive_count`: Patterns from passive LLM learning
 - `command_count`: Total commands in history
@@ -259,11 +268,13 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Exp
 ```
 
 **Parameters:**
+
 - `path`: Absolute path to export file (must be writable by service)
 
 **Returns:** `true` if successful.
 
 **Writable Paths:**
+
 - `~/.local/share/speechd-ng/`
 - `~/Documents/`
 
@@ -282,6 +293,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Imp
 ```
 
 **Parameters:**
+
 - `path`: Absolute path to import file
 - `merge`: If `true`, adds new patterns without overwriting existing
 
@@ -314,6 +326,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 **Returns:** Array of (heard, timestamp, context) tuples.
 
 **Notes:**
+
 - Automatically populated when LLM returns confused/error responses
 - Max 50 commands stored
 - Duplicates are filtered
@@ -341,12 +354,14 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Cor
 ```
 
 **Parameters:**
+
 - `heard`: The ignored ASR transcription
 - `meant`: What the user actually intended
 
 **Returns:** `true` if the command was found and corrected.
 
 **Notes:**
+
 - Removes from ignored list
 - Adds as manual correction pattern (70% confidence)
 
@@ -379,6 +394,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 ### `GetStatus() → (bool, f32, String, u32)`
 
 Returns a diagnostic summary:
+
 1. `ai_enabled` (bool): Is the LLM active?
 2. `passive_threshold` (f32): Confidence threshold for passive learning.
 3. `stt_backend` (String): Current STT backend.
@@ -395,6 +411,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 ```
 
 **Returns:**
+
 - `host`: Wyoming server host (e.g., `127.0.0.1`)
 - `port`: Wyoming server port (e.g., `10301`)
 - `model`: Configured Whisper model (e.g., `tiny`, `base`)
@@ -413,11 +430,13 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Pla
 ```
 
 **Parameters:**
+
 - `url`: HTTP/HTTPS URL to audio file (WAV, MP3, OGG, FLAC supported)
 
 **Returns:** Empty string on success, error message on failure.
 
 **Configuration** (`~/.config/speechd-ng/Speech.toml`):
+
 ```toml
 max_audio_size_mb = 50       # Max file size in MB
 playback_timeout_secs = 30   # Download timeout
@@ -425,6 +444,7 @@ playback_volume = 1.0        # Default volume (0.0-1.0)
 ```
 
 **Notes:**
+
 - Audio is fully downloaded before playback (no streaming)
 - Queues behind TTS (does not interrupt)
 - URL must start with `http://` or `https://`
@@ -452,6 +472,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Set
 ```
 
 **Parameters:**
+
 - `volume`: Volume level from 0.0 (mute) to 1.0 (full)
 
 **Returns:** `true` on success.
@@ -479,6 +500,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 ```
 
 **Returns:**
+
 - `is_playing`: Whether audio is currently playing
 - `current_url`: URL of currently playing audio (empty if not playing)
 
@@ -486,7 +508,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 
 ## Rate Limiting (Phase 17b)
 
-To prevent abuse, the daemon enforces rate limits per D-Bus sender. 
+To prevent abuse, the daemon enforces rate limits per D-Bus sender.
 
 | Method Type | Default Limit | Protected Methods |
 |-------------|---------------|-------------------|
@@ -496,6 +518,7 @@ To prevent abuse, the daemon enforces rate limits per D-Bus sender.
 | **Listen** | 30/min | `Listen`, `ListenVad` |
 
 **Behavior:**
+
 - If the limit is exceeded, the method returns a **D-Bus Error**: `org.freedesktop.DBus.Error.Failed: Rate limited`.
 - A log entry is created: `Rate limited: <Type> for sender :1.xxxx`.
 
@@ -516,6 +539,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Spe
 ```
 
 **Parameters:**
+
 - `text`: Text to speak
 - `voice`: Voice ID (empty for default)
 - `channel`: Target channel identifier (case-insensitive)
@@ -706,6 +730,52 @@ fn main() -> zbus::Result<()> {
 
 ---
 
+---
+
+## Local AI (Ollama) Management (Phase 19)
+
+These methods allow clients to monitor and control the local reasoning engine (Ollama).
+
+### `GetBrainStatus() → (is_running: Bool, current_model: String, available_models: Array[String])`
+
+Polls the Ollama API to verify health and list downloaded models.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service GetBrainStatus
+```
+
+**Returns:**
+
+- `is_running`: `true` if Ollama API is reachable.
+- `current_model`: The model currently configured in `Speech.toml`.
+- `available_models`: List of models already downloaded and ready to use.
+
+---
+
+### `ManageBrain(action: String, param: String) → Bool`
+
+Perform administrative actions on the Ollama service.
+
+```bash
+# Start the service
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service ManageBrain ss "start" ""
+
+# Pull a new model
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service ManageBrain ss "pull" "llama3"
+```
+
+**Parameters:**
+
+- `action`:
+  - `"start"`: Attempts to start the `ollama` service via `systemctl`.
+  - `"stop"`: Attempts to stop the `ollama` service via `systemctl`.
+  - `"pull"`: Initiates a model download.
+- `param`: Used for `"pull"` action to specify the model name (e.g., `"llama3"`).
+
+**Returns:** `true` if the operation was initiated successfully.
+
+---
+
 ## Error Handling
 
 - **Rate Limits**: Return `org.freedesktop.DBus.Error.Failed` (Message: "Rate limited").
@@ -714,6 +784,7 @@ fn main() -> zbus::Result<()> {
 - **Empty Data**: Empty arrays indicate no data found.
 
 The service logs detailed errors to journald for debugging:
+
 ```bash
 journalctl --user -u speechd-ng -f
 ```
@@ -732,4 +803,4 @@ journalctl --user -u speechd-ng -f
 
 ---
 
-*Last Updated: 2025-12-29 (v0.7.1)*
+*Last Updated: 2025-12-30 (v0.7.2)*

@@ -1,22 +1,23 @@
-mod engine;
-mod cortex;
-mod config_loader;
-mod security;
 mod backends;
+mod config_loader;
+mod cortex;
 mod ear;
-mod ssip;
+mod engine;
 mod fingerprint;
 mod rate_limiter;
-use engine::AudioEngine;
+mod security;
+mod ssip;
 use cortex::Cortex;
 use ear::Ear;
+use engine::AudioEngine;
 use fingerprint::Fingerprint;
+use rate_limiter::{LimitType, RateLimiter};
 use security::SecurityAgent;
-use rate_limiter::{RateLimiter, LimitType};
+use serde_json::json;
 use std::error::Error;
 use std::future::pending;
 use std::sync::{Arc, Mutex};
-use zbus::{interface, connection::Builder, message::Header, Connection};
+use zbus::{connection::Builder, interface, message::Header, Connection};
 
 struct SpeechService {
     engine: Arc<Mutex<AudioEngine>>,
@@ -40,7 +41,11 @@ impl SpeechService {
     }
 
     #[zbus(name = "Speak")]
-    async fn speak(&self, #[zbus(header)] header: Header<'_>, text: String) -> zbus::fdo::Result<()> {
+    async fn speak(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        text: String,
+    ) -> zbus::fdo::Result<()> {
         // Rate limit check
         if let Some(sender) = header.sender() {
             if !self.rate_limiter.check(sender.as_str(), LimitType::Tts) {
@@ -48,19 +53,23 @@ impl SpeechService {
                 return Err(zbus::fdo::Error::Failed("Rate limited".into()));
             }
         }
-        
+
         println!("Received speak request: {}", text);
-        
-        let audio_enabled = config_loader::SETTINGS.read()
+
+        let audio_enabled = config_loader::SETTINGS
+            .read()
             .map(|s| s.enable_audio)
             .unwrap_or(true);
-        
+
         if audio_enabled {
             if let Ok(engine) = self.engine.lock() {
                 engine.speak(&text, None);
             }
         }
-        let ai_enabled = config_loader::SETTINGS.read().map(|s| s.enable_ai).unwrap_or(true);
+        let ai_enabled = config_loader::SETTINGS
+            .read()
+            .map(|s| s.enable_ai)
+            .unwrap_or(true);
         if ai_enabled {
             self.cortex.observe(text).await;
         }
@@ -68,78 +77,98 @@ impl SpeechService {
     }
 
     #[zbus(name = "SpeakVoice")]
-    async fn speak_voice(&self, #[zbus(header)] header: Header<'_>, text: String, voice: String) -> zbus::fdo::Result<()> {
-         // Rate limit check
-         if let Some(sender) = header.sender() {
-             if !self.rate_limiter.check(sender.as_str(), LimitType::Tts) {
-                 println!("Rate limited: TTS for sender {}", sender);
-                 return Err(zbus::fdo::Error::Failed("Rate limited".into()));
-             }
-         }
-         
-         println!("Received speak request (voice: {}): {}", voice, text);
-         
-         let audio_enabled = config_loader::SETTINGS.read()
+    async fn speak_voice(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        text: String,
+        voice: String,
+    ) -> zbus::fdo::Result<()> {
+        // Rate limit check
+        if let Some(sender) = header.sender() {
+            if !self.rate_limiter.check(sender.as_str(), LimitType::Tts) {
+                println!("Rate limited: TTS for sender {}", sender);
+                return Err(zbus::fdo::Error::Failed("Rate limited".into()));
+            }
+        }
+
+        println!("Received speak request (voice: {}): {}", voice, text);
+
+        let audio_enabled = config_loader::SETTINGS
+            .read()
             .map(|s| s.enable_audio)
             .unwrap_or(true);
 
-         if audio_enabled {
-             if let Ok(engine) = self.engine.lock() {
-                 engine.speak(&text, Some(voice));
-             }
-         }
-         let ai_enabled = config_loader::SETTINGS.read().map(|s| s.enable_ai).unwrap_or(true);
-         if ai_enabled {
-             self.cortex.observe(text).await;
-         }
-         Ok(())
+        if audio_enabled {
+            if let Ok(engine) = self.engine.lock() {
+                engine.speak(&text, Some(voice));
+            }
+        }
+        let ai_enabled = config_loader::SETTINGS
+            .read()
+            .map(|s| s.enable_ai)
+            .unwrap_or(true);
+        if ai_enabled {
+            self.cortex.observe(text).await;
+        }
+        Ok(())
     }
 
     #[zbus(name = "ListVoices")]
     async fn list_voices(&self) -> Vec<(String, String)> {
         let engine = if let Ok(engine) = self.engine.lock() {
-             Some(engine.clone())
+            Some(engine.clone())
         } else {
             None
         };
 
         if let Some(engine) = engine {
-             let list = engine.list_voices().await;
-             list.into_iter().map(|v| (v.id, v.name)).collect()
+            let list = engine.list_voices().await;
+            list.into_iter().map(|v| (v.id, v.name)).collect()
         } else {
-             Vec::new()
+            Vec::new()
         }
     }
 
     #[zbus(name = "ListDownloadableVoices")]
     async fn list_downloadable_voices(&self) -> Vec<(String, String)> {
         let engine = if let Ok(engine) = self.engine.lock() {
-             Some(engine.clone())
+            Some(engine.clone())
         } else {
             None
         };
 
         if let Some(engine) = engine {
-             let list = engine.list_downloadable_voices().await;
-             list.into_iter().map(|v| (v.id, format!("{} [{}]", v.name, v.language))).collect()
+            let list = engine.list_downloadable_voices().await;
+            list.into_iter()
+                .map(|v| (v.id, format!("{} [{}]", v.name, v.language)))
+                .collect()
         } else {
-             Vec::new()
+            Vec::new()
         }
     }
 
     #[zbus(name = "DownloadVoice")]
-    async fn download_voice(&self, #[zbus(header)] header: Header<'_>, voice_id: String) -> zbus::fdo::Result<String> {
+    async fn download_voice(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        voice_id: String,
+    ) -> zbus::fdo::Result<String> {
         // Polkit authorization check
         if let Some(sender) = header.sender() {
             if let Ok(pid) = SecurityAgent::get_sender_pid(&self.conn, sender.as_str()).await {
-                if let Err(e) = SecurityAgent::check_permission_polkit(pid, "org.speech.service.manage").await {
-                    return Err(zbus::fdo::Error::AccessDenied(format!("Polkit denied: {}", e)));
+                if let Err(e) =
+                    SecurityAgent::check_permission_polkit(pid, "org.speech.service.manage").await
+                {
+                    return Err(zbus::fdo::Error::AccessDenied(format!(
+                        "Polkit denied: {}",
+                        e
+                    )));
                 }
             }
         }
 
         let engine = if let Ok(engine) = self.engine.lock() {
-             Some(engine.clone())
+            Some(engine.clone())
         } else {
             None
         };
@@ -150,16 +179,22 @@ impl SpeechService {
                 Err(e) => Err(zbus::fdo::Error::Failed(format!("Error: {}", e))),
             }
         } else {
-             Err(zbus::fdo::Error::Failed("Engine locked".to_string()))
+            Err(zbus::fdo::Error::Failed("Engine locked".to_string()))
         }
     }
 
     #[zbus(name = "Think")]
-    async fn think(&self, #[zbus(header)] header: Header<'_>, query: String) -> zbus::fdo::Result<String> {
+    async fn think(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        query: String,
+    ) -> zbus::fdo::Result<String> {
         // Polkit authorization check
         if let Some(sender) = header.sender() {
             if let Ok(pid) = SecurityAgent::get_sender_pid(&self.conn, sender.as_str()).await {
-                if let Err(e) = SecurityAgent::check_permission_polkit(pid, "org.speech.service.think").await {
+                if let Err(e) =
+                    SecurityAgent::check_permission_polkit(pid, "org.speech.service.think").await
+                {
                     eprintln!("Access Denied: {}", e);
                     return Err(zbus::fdo::Error::AccessDenied("Polkit denied".into()));
                 }
@@ -171,7 +206,8 @@ impl SpeechService {
             }
         }
 
-        let ai_enabled = config_loader::SETTINGS.read()
+        let ai_enabled = config_loader::SETTINGS
+            .read()
             .map(|s| s.enable_ai)
             .unwrap_or(true);
 
@@ -189,7 +225,9 @@ impl SpeechService {
         // Polkit authorization check
         if let Some(sender) = header.sender() {
             if let Ok(pid) = SecurityAgent::get_sender_pid(&self.conn, sender.as_str()).await {
-                if let Err(e) = SecurityAgent::check_permission_polkit(pid, "org.speech.service.listen").await {
+                if let Err(e) =
+                    SecurityAgent::check_permission_polkit(pid, "org.speech.service.listen").await
+                {
                     eprintln!("Access Denied: {}", e);
                     return Err(zbus::fdo::Error::AccessDenied("Polkit denied".into()));
                 }
@@ -202,7 +240,7 @@ impl SpeechService {
         }
 
         println!("Received listen request");
-        
+
         let ear = self.ear.clone();
         let result = tokio::task::spawn_blocking(move || {
             if let Ok(ear_guard) = ear.lock() {
@@ -210,7 +248,8 @@ impl SpeechService {
             } else {
                 "Error: Ear locked".to_string()
             }
-        }).await;
+        })
+        .await;
 
         match result {
             Ok(s) => Ok(s),
@@ -225,7 +264,9 @@ impl SpeechService {
         // Polkit authorization check
         if let Some(sender) = header.sender() {
             if let Ok(pid) = SecurityAgent::get_sender_pid(&self.conn, sender.as_str()).await {
-                if let Err(e) = SecurityAgent::check_permission_polkit(pid, "org.speech.service.listen").await {
+                if let Err(e) =
+                    SecurityAgent::check_permission_polkit(pid, "org.speech.service.listen").await
+                {
                     eprintln!("Access Denied: {}", e);
                     return Err(zbus::fdo::Error::AccessDenied("Polkit denied".into()));
                 }
@@ -238,7 +279,7 @@ impl SpeechService {
         }
 
         println!("Received VAD listen request");
-        
+
         let ear = self.ear.clone();
         let result = tokio::task::spawn_blocking(move || {
             if let Ok(ear_guard) = ear.lock() {
@@ -246,7 +287,8 @@ impl SpeechService {
             } else {
                 "Error: Ear locked".to_string()
             }
-        }).await;
+        })
+        .await;
 
         match result {
             Ok(s) => Ok(s),
@@ -273,52 +315,65 @@ impl SpeechService {
     /// Train a word by recording user speech and learning what ASR hears
     /// Returns (what_asr_heard, success)
     #[zbus(name = "TrainWord")]
-    async fn train_word(&self, #[zbus(header)] header: Header<'_>, expected: String, duration_secs: u32) -> zbus::fdo::Result<(String, bool)> {
+    async fn train_word(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        expected: String,
+        duration_secs: u32,
+    ) -> zbus::fdo::Result<(String, bool)> {
         // Polkit authorization check
         if let Some(sender) = header.sender() {
             if let Ok(pid) = SecurityAgent::get_sender_pid(&self.conn, sender.as_str()).await {
-                if let Err(e) = SecurityAgent::check_permission_polkit(pid, "org.speech.service.train").await {
+                if let Err(e) =
+                    SecurityAgent::check_permission_polkit(pid, "org.speech.service.train").await
+                {
                     eprintln!("Access Denied for TrainWord: {}", e);
                     return Err(zbus::fdo::Error::AccessDenied("Polkit denied".into()));
                 }
             }
         }
 
-        println!("Training word '{}' for {} seconds...", expected, duration_secs);
-        
+        println!(
+            "Training word '{}' for {} seconds...",
+            expected, duration_secs
+        );
+
         let ear = self.ear.clone();
         let fingerprint = self.fingerprint.clone();
         let expected_clone = expected.clone();
-        
+
         let result = tokio::task::spawn_blocking(move || {
             if let Ok(ear_guard) = ear.lock() {
                 // Record and transcribe
                 let heard = ear_guard.record_and_transcribe(duration_secs as u64);
                 let heard_trimmed = heard.trim().to_string();
-                
+
                 if heard_trimmed.is_empty() {
                     return ("[no speech detected]".to_string(), false);
                 }
-                
+
                 // Learn the correction
-                let success = fingerprint.add_manual_correction(heard_trimmed.clone(), expected_clone);
+                let success =
+                    fingerprint.add_manual_correction(heard_trimmed.clone(), expected_clone);
                 (heard_trimmed, success)
             } else {
                 ("Error: Ear locked".to_string(), false)
             }
-        }).await;
+        })
+        .await;
 
         match result {
             Ok((heard, success)) => {
                 // Audio feedback on success
                 if success {
-                    let feedback = format!("I heard {}. I'll remember that means {}.", heard, expected);
+                    let feedback =
+                        format!("I heard {}. I'll remember that means {}.", heard, expected);
                     if let Ok(engine) = self.engine.lock() {
                         engine.speak(&feedback, None);
                     }
                 }
                 Ok((heard, success))
-            },
+            }
             Err(e) => Err(zbus::fdo::Error::Failed(format!("Error: {}", e))),
         }
     }
@@ -333,7 +388,9 @@ impl SpeechService {
     /// List all learned patterns (for debugging/UI)
     #[zbus(name = "ListPatterns")]
     async fn list_patterns(&self) -> zbus::fdo::Result<Vec<(String, String, String)>> {
-        let patterns = self.fingerprint.get_all_patterns()
+        let patterns = self
+            .fingerprint
+            .get_all_patterns()
             .into_iter()
             .map(|(heard, meant, conf, source)| {
                 (heard, meant, format!("{:.0}% ({})", conf * 100.0, source))
@@ -381,7 +438,11 @@ impl SpeechService {
 
     /// Correct an ignored command - removes from ignored list and adds as pattern
     /// Returns true if the command was found and corrected
-    async fn correct_ignored_command(&self, heard: String, meant: String) -> zbus::fdo::Result<bool> {
+    async fn correct_ignored_command(
+        &self,
+        heard: String,
+        meant: String,
+    ) -> zbus::fdo::Result<bool> {
         println!("Correcting ignored command: '{}' -> '{}'", heard, meant);
         Ok(self.fingerprint.correct_ignored_command(&heard, &meant))
     }
@@ -410,8 +471,14 @@ impl SpeechService {
 
         let addr = format!("{}:{}", host, port);
         match tokio::net::TcpStream::connect(&addr).await {
-            Ok(_) => (true, format!("Successfully connected to Wyoming at {}", addr)),
-            Err(e) => (false, format!("Failed to connect to Wyoming at {}: {}", addr, e)),
+            Ok(_) => (
+                true,
+                format!("Successfully connected to Wyoming at {}", addr),
+            ),
+            Err(e) => (
+                false,
+                format!("Failed to connect to Wyoming at {}: {}", addr, e),
+            ),
         }
     }
 
@@ -419,9 +486,13 @@ impl SpeechService {
     async fn get_status(&self) -> zbus::fdo::Result<(bool, f32, String, u32)> {
         let (ai, thresh, stt) = {
             let s = config_loader::SETTINGS.read().unwrap();
-            (s.enable_ai, s.passive_confidence_threshold, s.stt_backend.clone())
+            (
+                s.enable_ai,
+                s.passive_confidence_threshold,
+                s.stt_backend.clone(),
+            )
         };
-        
+
         let (m, p, _) = self.fingerprint.get_stats();
         Ok((ai, thresh, stt, m + p))
     }
@@ -436,13 +507,17 @@ impl SpeechService {
             settings.wyoming_auto_start,
         ))
     }
-    
+
     // ========== Phase 15: Streaming Media Player ==========
-    
+
     /// Play audio from a URL
     /// Returns empty string on success, error message on failure
     #[zbus(name = "PlayAudio")]
-    async fn play_audio(&self, #[zbus(header)] header: Header<'_>, url: String) -> zbus::fdo::Result<String> {
+    async fn play_audio(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        url: String,
+    ) -> zbus::fdo::Result<String> {
         // Rate limit check
         if let Some(sender) = header.sender() {
             if !self.rate_limiter.check(sender.as_str(), LimitType::Audio) {
@@ -450,70 +525,70 @@ impl SpeechService {
                 return Err(zbus::fdo::Error::Failed("Rate limited".into()));
             }
         }
-        
+
         println!("Received PlayAudio request for URL: {}", url);
-        
+
         let engine = if let Ok(engine) = self.engine.lock() {
             Some(engine.clone())
         } else {
             return Err(zbus::fdo::Error::Failed("Engine locked".into()));
         };
-        
+
         if let Some(engine) = engine {
             match engine.play_audio(&url).await {
-                Ok(()) => Ok(String::new()),  // Empty string = success
+                Ok(()) => Ok(String::new()), // Empty string = success
                 Err(e) => Ok(e), // Legacy: return error as string for now if not rate limited
             }
         } else {
-             Err(zbus::fdo::Error::Failed("No engine".into()))
+            Err(zbus::fdo::Error::Failed("No engine".into()))
         }
     }
-    
+
     /// Stop current audio playback
     /// Returns true if something was stopped
     #[zbus(name = "StopAudio")]
     async fn stop_audio(&self) -> bool {
         println!("Received StopAudio request");
-        
+
         let engine = if let Ok(engine) = self.engine.lock() {
             Some(engine.clone())
         } else {
             return false;
         };
-        
+
         if let Some(engine) = engine {
             engine.stop_audio().await
         } else {
             false
         }
     }
-    
+
     /// Set playback volume (0.0 - 1.0)
     /// Returns true on success
     #[zbus(name = "SetVolume")]
     async fn set_volume(&self, volume: f64) -> bool {
         println!("Received SetVolume request: {}", volume);
-        
+
         let engine = if let Ok(engine) = self.engine.lock() {
             Some(engine.clone())
         } else {
             return false;
         };
-        
+
         if let Some(engine) = engine {
             engine.set_volume(volume as f32).await
         } else {
             false
         }
     }
-    
+
     /// Get current volume setting (0.0 - 1.0)
     #[zbus(name = "GetVolume")]
     async fn get_volume(&self) -> f64 {
         let settings = crate::config_loader::SETTINGS.read().unwrap();
         settings.playback_volume as f64
     }
-    
+
     /// Get playback status
     /// Returns (is_playing, current_url_or_empty)
     #[zbus(name = "GetPlaybackStatus")]
@@ -523,27 +598,31 @@ impl SpeechService {
         } else {
             return (false, String::new());
         };
-        
+
         if let Some(engine) = engine {
             engine.get_playback_status().await
         } else {
             (false, String::new())
         }
     }
-    
+
     // ========== Phase 16: Multi-Channel Audio ==========
-    
+
     /// Speak text to a specific audio channel
     /// channel: "left", "right", "center", or "stereo" (default)
     /// Returns true on success
     #[zbus(name = "SpeakChannel")]
     async fn speak_channel(&self, text: String, voice: String, channel: String) -> bool {
-        println!("Received SpeakChannel: '{}' -> {} (channel: {})", text, voice, channel);
-        
-        let audio_enabled = config_loader::SETTINGS.read()
+        println!(
+            "Received SpeakChannel: '{}' -> {} (channel: {})",
+            text, voice, channel
+        );
+
+        let audio_enabled = config_loader::SETTINGS
+            .read()
             .map(|s| s.enable_audio)
             .unwrap_or(true);
-        
+
         if audio_enabled {
             if let Ok(engine) = self.engine.lock() {
                 let voice_opt = if voice.is_empty() { None } else { Some(voice) };
@@ -553,20 +632,20 @@ impl SpeechService {
         }
         false
     }
-    
+
     /// Play audio from URL to a specific channel
     /// channel: "left", "right", "center", or "stereo"
     /// Returns empty string on success, error message on failure
     #[zbus(name = "PlayAudioChannel")]
     async fn play_audio_channel(&self, url: String, channel: String) -> String {
         println!("Received PlayAudioChannel: {} -> {}", url, channel);
-        
+
         let engine = if let Ok(engine) = self.engine.lock() {
             Some(engine.clone())
         } else {
             return "Error: Engine locked".to_string();
         };
-        
+
         if let Some(engine) = engine {
             match engine.play_audio_channel(&url, &channel).await {
                 Ok(()) => String::new(),
@@ -576,7 +655,7 @@ impl SpeechService {
             "Error: No engine".to_string()
         }
     }
-    
+
     /// List available audio channels
     /// Returns list of (channel_name, description) tuples
     #[zbus(name = "ListChannels")]
@@ -588,9 +667,9 @@ impl SpeechService {
             ("stereo".to_string(), "Full stereo (default)".to_string()),
         ]
     }
-    
+
     // ========== Phase 16b: PipeWire Device Routing ==========
-    
+
     /// List available PipeWire audio sinks
     /// Returns list of (id, name, description, is_default) tuples
     #[zbus(name = "ListSinks")]
@@ -603,15 +682,15 @@ impl SpeechService {
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                
+
                 // Debug logging
                 if stdout.is_empty() {
                     eprintln!("ListSinks: wpctl returned empty stdout, stderr: {}", stderr);
                 }
-                
+
                 let mut sinks = Vec::new();
                 let mut in_sinks_section = false;
-                
+
                 for line in stdout.lines() {
                     // Check for Sinks section start (with box-drawing chars)
                     if line.contains("Sinks:") && !line.contains("Sources:") {
@@ -620,25 +699,28 @@ impl SpeechService {
                     }
                     if in_sinks_section {
                         // End of sinks section - Sources line or empty sink line
-                        if line.contains("Sources:") || line.contains("Streams:") || 
-                           line.contains("Filters:") {
+                        if line.contains("Sources:")
+                            || line.contains("Streams:")
+                            || line.contains("Filters:")
+                        {
                             break;
                         }
-                        
+
                         // Skip empty or header lines
                         if !line.contains("[vol:") && !line.contains(".") {
                             continue;
                         }
-                        
+
                         // Parse sink line: " │  *   68. SB Omni Surround 5.1 [vol: 1.00]"
                         let is_default = line.contains("*");
-                        
+
                         // Strip box-drawing characters and whitespace
-                        let cleaned: String = line.chars()
+                        let cleaned: String = line
+                            .chars()
                             .filter(|c| !['│', '├', '└', '─', '┬', '┤', '┴', '┼'].contains(c))
                             .collect();
                         let trimmed = cleaned.trim().trim_start_matches('*').trim();
-                        
+
                         // Find number before first dot
                         if let Some(dot_pos) = trimmed.find('.') {
                             if let Ok(id) = trimmed[..dot_pos].trim().parse::<u32>() {
@@ -649,9 +731,14 @@ impl SpeechService {
                                 } else {
                                     rest
                                 };
-                                
+
                                 if !name.is_empty() {
-                                    sinks.push((id, name.to_string(), name.to_string(), is_default));
+                                    sinks.push((
+                                        id,
+                                        name.to_string(),
+                                        name.to_string(),
+                                        is_default,
+                                    ));
                                 }
                             }
                         }
@@ -665,14 +752,14 @@ impl SpeechService {
             }
         }
     }
-    
+
     /// Speak text to a specific PipeWire device by ID
     /// First sets the device as default, speaks, then optionally restores
     /// Returns true on success
     #[zbus(name = "SpeakToDevice")]
     async fn speak_to_device(&self, text: String, voice: String, device_id: u32) -> bool {
         println!("Received SpeakToDevice: '{}' -> device {}", text, device_id);
-        
+
         // Get current default sink to restore later
         let current_default = std::process::Command::new("/usr/bin/wpctl")
             .args(["inspect", "@DEFAULT_AUDIO_SINK@"])
@@ -681,27 +768,29 @@ impl SpeechService {
             .and_then(|o| {
                 let stdout = String::from_utf8_lossy(&o.stdout);
                 // Extract id from output
-                stdout.lines()
+                stdout
+                    .lines()
                     .find(|l| l.trim().starts_with("id"))
                     .and_then(|l| l.split_whitespace().nth(1))
                     .and_then(|s| s.trim_matches(',').parse::<u32>().ok())
             });
-        
+
         // Set target device as default
         let set_result = std::process::Command::new("/usr/bin/wpctl")
             .args(["set-default", &device_id.to_string()])
             .status();
-        
+
         if set_result.is_err() || !set_result.unwrap().success() {
             eprintln!("Failed to set default sink to {}", device_id);
             return false;
         }
-        
+
         // Speak
-        let audio_enabled = config_loader::SETTINGS.read()
+        let audio_enabled = config_loader::SETTINGS
+            .read()
             .map(|s| s.enable_audio)
             .unwrap_or(true);
-        
+
         if audio_enabled {
             if let Ok(engine) = self.engine.lock() {
                 let voice_opt = if voice.is_empty() { None } else { Some(voice) };
@@ -709,30 +798,110 @@ impl SpeechService {
                 engine.speak(&text, voice_opt);
             }
         }
-        
+
         // Wait a moment for audio to start playing through the new device
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-        
+
         // Restore previous default if we had one
         if let Some(prev_id) = current_default {
             let _ = std::process::Command::new("/usr/bin/wpctl")
                 .args(["set-default", &prev_id.to_string()])
                 .status();
         }
-        
+
         true
     }
-    
+
     /// Get the current default audio sink
     /// Returns (id, name) or (0, "") if not found
     #[zbus(name = "GetDefaultSink")]
     async fn get_default_sink(&self) -> (u32, String) {
         // Find the default sink from ListSinks
         let sinks = self.list_sinks().await;
-        sinks.into_iter()
+        sinks
+            .into_iter()
             .find(|(_, _, _, is_default)| *is_default)
             .map(|(id, name, _, _)| (id, name))
             .unwrap_or((0, String::new()))
+    }
+
+    // ========== Phase 17: Brain Management (Local AI) ==========
+
+    /// Get current status of the AI brain (Ollama)
+    /// Returns (is_running, current_model, available_models)
+    #[zbus(name = "GetBrainStatus")]
+    async fn get_brain_status(&self) -> (bool, String, Vec<String>) {
+        let (url, model) = {
+            let settings = crate::config_loader::SETTINGS.read().unwrap();
+            (settings.ollama_url.clone(), settings.ollama_model.clone())
+        };
+
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(2))
+            .build()
+            .unwrap_or_default();
+
+        let res = client.get(&format!("{}/api/tags", url)).send().await;
+
+        let mut available = Vec::new();
+        let is_running = match res {
+            Ok(resp) => {
+                if let Ok(json) = resp.json::<serde_json::Value>().await {
+                    if let Some(models) = json["models"].as_array() {
+                        for m in models {
+                            if let Some(name) = m["name"].as_str() {
+                                available.push(name.to_string());
+                            }
+                        }
+                    }
+                }
+                true
+            }
+            Err(_) => false,
+        };
+
+        (is_running, model, available)
+    }
+
+    /// Manage the AI brain
+    /// Actions: "start", "stop", "pull"
+    #[zbus(name = "ManageBrain")]
+    async fn manage_brain(&self, action: String, param: String) -> bool {
+        match action.as_str() {
+            "start" => {
+                // Try system-wide service first, then user service
+                let _ = std::process::Command::new("systemctl")
+                    .args(["start", "ollama"])
+                    .status();
+                std::process::Command::new("systemctl")
+                    .args(["--user", "start", "ollama"])
+                    .status()
+                    .is_ok()
+            }
+            "stop" => {
+                let _ = std::process::Command::new("systemctl")
+                    .args(["stop", "ollama"])
+                    .status();
+                std::process::Command::new("systemctl")
+                    .args(["--user", "stop", "ollama"])
+                    .status()
+                    .is_ok()
+            }
+            "pull" => {
+                let url = {
+                    let settings = crate::config_loader::SETTINGS.read().unwrap();
+                    settings.ollama_url.clone()
+                };
+                let client = reqwest::Client::new();
+                let res = client
+                    .post(&format!("{}/api/pull", url))
+                    .json(&json!({"name": param, "stream": false}))
+                    .send()
+                    .await;
+                res.is_ok()
+            }
+            _ => false,
+        }
     }
 }
 
@@ -748,12 +917,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .name("org.speech.Service")?
         .build()
         .await?;
-    
+
     // Initialize rate limiter from config
     let config = config_loader::SETTINGS.read().unwrap();
-    println!("Loaded Rate Limits - TTS: {}, AI: {}, Audio: {}, Listen: {}", 
-        config.rate_limit_tts, config.rate_limit_ai, config.rate_limit_audio, config.rate_limit_listen);
-        
+    println!(
+        "Loaded Rate Limits - TTS: {}, AI: {}, Audio: {}, Listen: {}",
+        config.rate_limit_tts,
+        config.rate_limit_ai,
+        config.rate_limit_audio,
+        config.rate_limit_listen
+    );
+
     let rate_limiter = Arc::new(RateLimiter::new(
         config.rate_limit_tts,
         config.rate_limit_ai,
@@ -761,16 +935,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
         config.rate_limit_listen,
     ));
     drop(config); // Release the read lock
-    
+
     // Register the service interface with a clone of the connection
-    conn.object_server().at("/org/speech/Service", SpeechService { 
-        engine: engine.clone(), 
-        cortex: cortex.clone(), 
-        ear: ear.clone(),
-        fingerprint: fingerprint.clone(),
-        conn: conn.clone(),
-        rate_limiter: rate_limiter.clone(),
-    }).await?;
+    conn.object_server()
+        .at(
+            "/org/speech/Service",
+            SpeechService {
+                engine: engine.clone(),
+                cortex: cortex.clone(),
+                ear: ear.clone(),
+                fingerprint: fingerprint.clone(),
+                conn: conn.clone(),
+                rate_limiter: rate_limiter.clone(),
+            },
+        )
+        .await?;
 
     println!("Speech Service running at org.speech.Service");
 
@@ -783,14 +962,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Start Autonomous Mode (Wake Word + Command Processing)
     let config = config_loader::SETTINGS.read().unwrap();
     if config.enable_wake_word {
-         let ear_handler = ear.clone();
-         let engine_handler = engine.clone();
-         let cortex_handler = cortex.clone();
-         tokio::task::spawn_blocking(move || {
-             if let Ok(ear_guard) = ear_handler.lock() {
-                 ear_guard.start_autonomous_mode(engine_handler, cortex_handler);
-             }
-         });
+        let ear_handler = ear.clone();
+        let engine_handler = engine.clone();
+        let cortex_handler = cortex.clone();
+        tokio::task::spawn_blocking(move || {
+            if let Ok(ear_guard) = ear_handler.lock() {
+                ear_guard.start_autonomous_mode(engine_handler, cortex_handler);
+            }
+        });
     }
 
     pending::<()>().await;

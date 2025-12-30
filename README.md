@@ -4,13 +4,13 @@
 
 ## 🚀 Mission
 
-1.  **Window Manager Agnostic**: Works flawlessly on GNOME, KDE, Sway, Hyprland, and raw TTYs.
-2.  **Service-Based**: Runs as a standard `systemd` user service.
-3.  **Secure by Design**: Uses D-Bus for IPC with strict isolation and Polkit authorization.
-4.  **AI-Ready**: Built to integrate with local LLMs (like Ollama) for contextual understanding.
-5.  **Neural First**: First-class support for high-quality Piper neural voices.
-6.  **Autonomous**: Integrated wake word detection for hands-free interaction.
-7.  **Self-Improving**: Passive and manual voice learning to correct transcription errors over time.
+1. **Window Manager Agnostic**: Works flawlessly on GNOME, KDE, Sway, Hyprland, and raw TTYs.
+2. **Service-Based**: Runs as a standard `systemd` user service.
+3. **Secure by Design**: Uses D-Bus for IPC with strict isolation and Polkit authorization.
+4. **AI-Ready**: Built to integrate with local LLMs (like Ollama) for contextual understanding.
+5. **Neural First**: First-class support for high-quality Piper neural voices.
+6. **Autonomous**: Integrated wake word detection for hands-free interaction.
+7. **Self-Improving**: Passive and manual voice learning to correct transcription errors over time.
 
 ## 🏗 Architecture
 
@@ -90,7 +90,6 @@ wake_word = "mango"
 enable_wake_word = false
 ```
 
-
 ## 📡 Quick Start
 
 ```bash
@@ -124,6 +123,7 @@ See **[docs/API_REFERENCE.md](docs/API_REFERENCE.md)** for the complete D-Bus AP
 | **Core** | `Ping`, `GetVersion`, `GetStatus` |
 | **TTS** | `Speak`, `SpeakVoice`, `ListVoices`, `ListDownloadableVoices`, `DownloadVoice` |
 | **AI** | `Think`, `Listen` |
+| **Brain Mgmt** | `GetBrainStatus`, `ManageBrain` |
 | **Training** | `AddCorrection`, `TrainWord`, `ListPatterns`, `GetFingerprintStats` |
 | **Import/Export** | `ExportFingerprint`, `ImportFingerprint`, `GetFingerprintPath` |
 | **Ignored** | `GetIgnoredCommands`, `CorrectIgnoredCommand`, `ClearIgnoredCommands` |
@@ -138,6 +138,7 @@ When enabled, the daemon listens for a wake word and responds:
 4. AI processes and responds via TTS
 
 Enable in config:
+
 ```toml
 wake_word = "mango"
 enable_wake_word = true
@@ -148,9 +149,11 @@ enable_wake_word = true
 SpeechD-NG learns from your voice to improve accuracy:
 
 ### Passive Learning
+
 When the LLM corrects an ASR error, the system automatically learns the pattern.
 
 ### Manual Training
+
 Explicitly teach the system words it mishears:
 
 ```bash
@@ -215,6 +218,7 @@ MIT License - See [LICENSE](LICENSE) for details.
 ## 🤝 Contributing
 
 Contributions welcome! Please see:
+
 - [ROADMAP.md](ROADMAP.md) - Development phases
 - [examples/python_client.py](examples/python_client.py) - Ready-to-run Python client
 - [docs/API_REFERENCE.md](docs/API_REFERENCE.md) - API documentation

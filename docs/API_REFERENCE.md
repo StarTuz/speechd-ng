@@ -419,6 +419,21 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 
 ---
 
+### `CheckWyomingHealth() → (is_reachable: bool, message: String)`
+
+Check if the Wyoming server is reachable.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service CheckWyomingHealth
+```
+
+**Returns:**
+
+- `is_reachable`: `true` if the server is reachable.
+- `message`: Status message (e.g., "Successfully connected to Wyoming at 127.0.0.1:10301")
+
+---
+
 ## Streaming Media Player (Phase 15)
 
 ### `PlayAudio(url: String) → String`

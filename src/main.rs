@@ -26,6 +26,7 @@ struct SpeechService {
     fingerprint: Fingerprint,
     conn: Connection,
     rate_limiter: Arc<RateLimiter>,
+    model_override: Arc<Mutex<Option<String>>>,
 }
 
 #[interface(name = "org.speech.Service")]
@@ -831,10 +832,23 @@ impl SpeechService {
     /// Returns (is_running, current_model, available_models)
     #[zbus(name = "GetBrainStatus")]
     async fn get_brain_status(&self) -> (bool, String, Vec<String>) {
-        let (url, model) = {
-            let settings = crate::config_loader::SETTINGS.read().unwrap();
-            (settings.ollama_url.clone(), settings.ollama_model.clone())
-        };
+        // Check for runtime override first, else use config
+        let model = self
+            .model_override
+            .lock()
+            .unwrap()
+            .clone()
+            .unwrap_or_else(|| {
+                crate::config_loader::SETTINGS
+                    .read()
+                    .map(|s| s.ollama_model.clone())
+                    .unwrap_or_else(|_| "unknown".to_string())
+            });
+
+        let url = crate::config_loader::SETTINGS
+            .read()
+            .map(|s| s.ollama_url.clone())
+            .unwrap_or_else(|_| "http://localhost:11434".to_string());
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(2))
@@ -900,7 +914,33 @@ impl SpeechService {
                     .await;
                 res.is_ok()
             }
+            "use" => {
+                // Switch model at runtime
+                self.set_brain_model(param).await
+            }
             _ => false,
+        }
+    }
+
+    /// Set the AI model at runtime (no restart required)
+    /// Returns true if successful
+    #[zbus(name = "SetBrainModel")]
+    async fn set_brain_model(&self, model: String) -> bool {
+        if model.is_empty() {
+            return false;
+        }
+
+        // Use dedicated Mutex (bypasses SETTINGS RwLock contention)
+        if let Ok(mut override_lock) = self.model_override.lock() {
+            let old = override_lock
+                .clone()
+                .unwrap_or_else(|| "<default>".to_string());
+            *override_lock = Some(model.clone());
+            println!("Switched AI model: {} → {}", old, model);
+            true
+        } else {
+            println!("SetBrainModel: Failed to acquire lock");
+            false
         }
     }
 }
@@ -947,6 +987,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 fingerprint: fingerprint.clone(),
                 conn: conn.clone(),
                 rate_limiter: rate_limiter.clone(),
+                model_override: Arc::new(Mutex::new(None)),
             },
         )
         .await?;

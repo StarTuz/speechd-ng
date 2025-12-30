@@ -113,6 +113,11 @@ enum BrainAction {
         /// Model name (e.g., llama3, mistral)
         model: String,
     },
+    /// Switch to a different model
+    Use {
+        /// Model name to use (e.g., llama3, mistral)
+        model: String,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -425,6 +430,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             "Failed to pull"
                         }
                     );
+                }
+                Some(BrainAction::Use { model }) => {
+                    let success: bool = conn
+                        .call_method(Some(dest), path, Some(iface), "SetBrainModel", &model)?
+                        .body()
+                        .deserialize()?;
+                    if success {
+                        println!("✓ Switched to model: {}", model);
+                    } else {
+                        println!("✗ Failed to switch model. Is '{}' installed?", model);
+                    }
                 }
             }
         }

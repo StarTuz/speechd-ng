@@ -777,6 +777,9 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Man
 
 # Pull a new model
 busctl --user call org.speech.Service /org/speech/Service org.speech.Service ManageBrain ss "pull" "llama3"
+
+# Switch to a model (alias for SetBrainModel)
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service ManageBrain ss "use" "llama3:latest"
 ```
 
 **Parameters:**
@@ -785,9 +788,38 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Man
   - `"start"`: Attempts to start the `ollama` service via `systemctl`.
   - `"stop"`: Attempts to stop the `ollama` service via `systemctl`.
   - `"pull"`: Initiates a model download.
-- `param`: Used for `"pull"` action to specify the model name (e.g., `"llama3"`).
+  - `"use"`: Switch to a different model at runtime (same as `SetBrainModel`).
+- `param`: Model name for `"pull"` or `"use"` actions (e.g., `"llama3:latest"`).
 
 **Returns:** `true` if the operation was initiated successfully.
+
+---
+
+### `SetBrainModel(model: String) → Bool`
+
+Switch the AI model at runtime without restarting the daemon.
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service SetBrainModel s "llama3:latest"
+```
+
+**CLI Example:**
+
+```bash
+speechd-control brain use llama3:latest
+```
+
+**Parameters:**
+
+- `model`: Model name to switch to (e.g., `"llama3:latest"`, `"mistral:latest"`).
+
+**Returns:** `true` if the model was switched successfully.
+
+**Notes:**
+
+- Does not validate model availability (trusts user input).
+- Change persists until daemon restart; to persist permanently, update `Speech.toml`.
+- Check available models with `GetBrainStatus()`.
 
 ---
 

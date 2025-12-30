@@ -7,8 +7,17 @@ description = "A modern, secure, next-generation speech server for Linux written
 license = "MIT"
 repository = "https://github.com/StarTuz/speechd-ng"
 
+[[bin]]
+name = "speechserverdaemon"
+path = "src/main.rs"
+
+[[bin]]
+name = "speechd-control"
+path = "src/bin/speechd-control.rs"
+
 [dependencies]
 chrono = "0.4"
+clap = { version = "4.5", features = ["derive"] }
 config = "0.15.19"
 cpal = "0.17.0"
 hound = "3.5.1"
@@ -33,9 +42,11 @@ section = "utils"
 priority = "optional"
 assets = [
     ["target/release/speechserverdaemon", "usr/bin/", "755"],
+    ["target/release/speechd-control", "usr/bin/", "755"],
     ["src/wakeword_bridge.py", "usr/lib/speechd-ng/", "755"],
     ["src/wyoming_bridge.py", "usr/lib/speechd-ng/", "755"],
     ["systemd/speechd-ng.service", "usr/lib/systemd/user/", "644"],
     ["README.md", "usr/share/doc/speechserverdaemon/README", "644"],
 ]
 conf-files = []
+

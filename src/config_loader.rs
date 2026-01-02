@@ -1,7 +1,7 @@
-use serde::Deserialize;
 use config::{Config, File};
-use std::sync::RwLock;
 use lazy_static::lazy_static;
+use serde::Deserialize;
+use std::sync::RwLock;
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
@@ -21,21 +21,25 @@ pub struct Settings {
     pub vad_silence_threshold: i16,
     pub vad_silence_duration_ms: u64,
     pub vad_max_duration_ms: u64,
-    // Wyoming Settings (Phase 13)
-    pub stt_backend: String,       // "vosk" or "wyoming"
+    // STT Settings
+    pub stt_backend: String, // "vosk", "wyoming", or "whisper"
     pub wyoming_host: String,
     pub wyoming_port: u16,
     pub wyoming_auto_start: bool,
-    pub wyoming_model: String,     // "tiny", "base", "small", "medium", "large"
+    pub wyoming_device: String, // "cpu" or "cuda"
+    pub wyoming_model: String,  // "tiny", "base", "small", "medium", "large"
+    // Native Whisper settings
+    pub whisper_model_path: String, // Path to .bin model file
+    pub whisper_language: String,   // "en", "auto", etc.
     // Media Player Settings (Phase 15)
-    pub max_audio_size_mb: u64,    // Max audio file download size in MB
+    pub max_audio_size_mb: u64,     // Max audio file download size in MB
     pub playback_timeout_secs: u64, // Timeout for audio downloads
-    pub playback_volume: f32,      // Default volume (0.0 - 1.0)
+    pub playback_volume: f32,       // Default volume (0.0 - 1.0)
     // Rate Limiting Settings (Phase 17b)
-    pub rate_limit_tts: u32,       // TTS requests per minute
-    pub rate_limit_ai: u32,        // AI/Think requests per minute
-    pub rate_limit_audio: u32,     // PlayAudio requests per minute
-    pub rate_limit_listen: u32,    // Listen requests per minute
+    pub rate_limit_tts: u32,    // TTS requests per minute
+    pub rate_limit_ai: u32,     // AI/Think requests per minute
+    pub rate_limit_audio: u32,  // PlayAudio requests per minute
+    pub rate_limit_listen: u32, // Listen requests per minute
 }
 
 impl Default for Settings {
@@ -62,7 +66,14 @@ impl Default for Settings {
             wyoming_host: "127.0.0.1".to_string(),
             wyoming_port: 10301,
             wyoming_auto_start: true,
+            wyoming_device: "cpu".to_string(),
             wyoming_model: "tiny".to_string(),
+            // Native Whisper defaults
+            whisper_model_path: format!(
+                "{}/.cache/whisper/ggml-tiny.en.bin",
+                std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+            ),
+            whisper_language: "en".to_string(),
             // Media Player defaults (Phase 15)
             max_audio_size_mb: 50,
             playback_timeout_secs: 30,
@@ -77,9 +88,8 @@ impl Default for Settings {
 }
 
 lazy_static! {
-    pub static ref SETTINGS: RwLock<Settings> = RwLock::new(
-        Settings::new().expect("Failed to load settings")
-    );
+    pub static ref SETTINGS: RwLock<Settings> =
+        RwLock::new(Settings::new().expect("Failed to load settings"));
 }
 
 impl Settings {
@@ -107,7 +117,17 @@ impl Settings {
             .set_default("wyoming_host", "127.0.0.1")?
             .set_default("wyoming_port", 10301)?
             .set_default("wyoming_auto_start", true)?
+            .set_default("wyoming_device", "cpu")?
             .set_default("wyoming_model", "tiny")?
+            // Native Whisper defaults
+            .set_default(
+                "whisper_model_path",
+                format!(
+                    "{}/.cache/whisper/ggml-tiny.en.bin",
+                    std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+                ),
+            )?
+            .set_default("whisper_language", "en")?
             // Media Player defaults (Phase 15)
             .set_default("max_audio_size_mb", 50)?
             .set_default("playback_timeout_secs", 30)?
@@ -119,7 +139,13 @@ impl Settings {
             .set_default("rate_limit_listen", 30)?
             // Merge with local config file (if exists)
             .add_source(File::with_name("Speech").required(false))
-            .add_source(File::with_name(&format!("{}/.config/speechd-ng/Speech", std::env::var("HOME").unwrap_or_default())).required(false))
+            .add_source(
+                File::with_name(&format!(
+                    "{}/.config/speechd-ng/Speech",
+                    std::env::var("HOME").unwrap_or_default()
+                ))
+                .required(false),
+            )
             // Merge with environment variables (e.g. SPEECH_OLLAMA_URL)
             .add_source(config::Environment::with_prefix("SPEECH"));
 
@@ -136,10 +162,14 @@ impl Settings {
             )));
         }
         if self.memory_size == 0 {
-             return Err(config::ConfigError::Message("memory_size must be greater than 0".to_string()));
+            return Err(config::ConfigError::Message(
+                "memory_size must be greater than 0".to_string(),
+            ));
         }
         if self.vad_speech_threshold <= 0 {
-             return Err(config::ConfigError::Message("vad_speech_threshold must be positive".to_string()));
+            return Err(config::ConfigError::Message(
+                "vad_speech_threshold must be positive".to_string(),
+            ));
         }
         Ok(())
     }

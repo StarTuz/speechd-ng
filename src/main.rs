@@ -498,14 +498,15 @@ impl SpeechService {
         Ok((ai, thresh, stt, m + p))
     }
 
-    /// Returns Wyoming connection info: (host, port, model, auto_start)
-    async fn get_wyoming_info(&self) -> zbus::fdo::Result<(String, u16, String, bool)> {
+    /// Returns Wyoming connection info: (host, port, model, auto_start, device)
+    async fn get_wyoming_info(&self) -> zbus::fdo::Result<(String, u16, String, bool, String)> {
         let settings = crate::config_loader::SETTINGS.read().unwrap();
         Ok((
             settings.wyoming_host.clone(),
             settings.wyoming_port,
             settings.wyoming_model.clone(),
             settings.wyoming_auto_start,
+            settings.wyoming_device.clone(),
         ))
     }
 

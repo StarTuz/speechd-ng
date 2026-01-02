@@ -287,8 +287,8 @@ impl Ear {
                     }
                 }
 
-                // Small sleep before restarting loop if bridge exited
-                thread::sleep(Duration::from_millis(100));
+                // Prevent rapid mic-cycling "loop from hell" if bridge fails
+                thread::sleep(Duration::from_secs(5));
             }
         });
     }
@@ -585,6 +585,13 @@ impl Ear {
         };
 
         match stt_backend.as_str() {
+            "whisper" => match self.transcribe_whisper(path) {
+                Ok(text) => Ok(text),
+                Err(e) => {
+                    eprintln!("Ear: Whisper backend failed: {}. Falling back to Vosk.", e);
+                    self.transcribe_vosk(path)
+                }
+            },
             "wyoming" => match self.transcribe_wyoming(path) {
                 Ok(text) => Ok(text),
                 Err(e) => {
@@ -594,6 +601,27 @@ impl Ear {
             },
             _ => self.transcribe_vosk(path),
         }
+    }
+
+    /// Transcribe using native Whisper backend (whisper.cpp via whisper-rs)
+    fn transcribe_whisper(&self, wav_path: &str) -> Result<String, String> {
+        let (model_path, language) = {
+            let settings = crate::config_loader::SETTINGS
+                .read()
+                .map_err(|_| "Settings lock error")?;
+            (
+                settings.whisper_model_path.clone(),
+                settings.whisper_language.clone(),
+            )
+        };
+
+        println!(
+            "Ear: [Whisper] Transcribing {} with model {}",
+            wav_path, model_path
+        );
+
+        let backend = crate::backends::whisper::WhisperBackend::new(&model_path, &language);
+        backend.transcribe(wav_path)
     }
 
     /// Transcribe using Vosk CLI
@@ -635,12 +663,87 @@ impl Ear {
 
     /// Transcribe using Wyoming bridge (streams to Wyoming-Whisper server)
     fn transcribe_wyoming(&self, wav_path: &str) -> Result<String, String> {
-        let (host, port) = {
+        let (host, port, auto_start, model, device) = {
             let settings = crate::config_loader::SETTINGS
                 .read()
                 .map_err(|_| "Settings lock error".to_string())?;
-            (settings.wyoming_host.clone(), settings.wyoming_port)
+            (
+                settings.wyoming_host.clone(),
+                settings.wyoming_port,
+                settings.wyoming_auto_start,
+                settings.wyoming_model.clone(),
+                settings.wyoming_device.clone(),
+            )
         };
+
+        // Check if Wyoming server is reachable, auto-start if needed
+        let addr = format!("{}:{}", host, port);
+        let server_available = std::net::TcpStream::connect_timeout(
+            &addr
+                .parse()
+                .unwrap_or_else(|_| std::net::SocketAddr::from(([127, 0, 0, 1], port))),
+            Duration::from_secs(2),
+        )
+        .is_ok();
+
+        if !server_available {
+            if auto_start {
+                println!(
+                    "Ear: [Wyoming] Server not running at {}. Auto-starting wyoming-faster-whisper...",
+                    addr
+                );
+
+                // Spawn wyoming-faster-whisper in background
+                let uri = format!("tcp://{}:{}", host, port);
+                let spawn_result = Command::new("wyoming-faster-whisper")
+                    .args(["--model", &model, "--device", &device, "--uri", &uri])
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn();
+
+                match spawn_result {
+                    Ok(_child) => {
+                        println!(
+                            "Ear: [Wyoming] Spawned server with model={}, device={}",
+                            model, device
+                        );
+
+                        // Wait for server to become available (up to 15 seconds)
+                        let mut ready = false;
+                        for i in 0..30 {
+                            thread::sleep(Duration::from_millis(500));
+                            if std::net::TcpStream::connect_timeout(
+                                &addr.parse().unwrap_or_else(|_| {
+                                    std::net::SocketAddr::from(([127, 0, 0, 1], port))
+                                }),
+                                Duration::from_secs(1),
+                            )
+                            .is_ok()
+                            {
+                                println!("Ear: [Wyoming] Server ready after {}ms", (i + 1) * 500);
+                                ready = true;
+                                break;
+                            }
+                        }
+
+                        if !ready {
+                            return Err("Wyoming server failed to start within timeout".to_string());
+                        }
+                    }
+                    Err(e) => {
+                        return Err(format!(
+                            "Failed to spawn wyoming-faster-whisper: {}. Is it installed?",
+                            e
+                        ));
+                    }
+                }
+            } else {
+                return Err(format!(
+                    "Wyoming server not running at {} and auto_start is disabled",
+                    addr
+                ));
+            }
+        }
 
         println!("Ear: [Wyoming] Transcribing via {}:{}", host, port);
 

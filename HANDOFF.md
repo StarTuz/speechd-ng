@@ -2,7 +2,7 @@
 
 ## Current Context
 
-We have completed **Phase 16a** of the roadmap. **SpeechD-NG v0.4.0** now includes **multi-channel audio** for aviation and gaming use cases.
+We have completed **Phase 16a** of the roadmap plus **Native Whisper STT Backend**. **SpeechD-NG v0.7.2** now includes **multi-channel audio** and **Python-free speech recognition**.
 
 ## Status: All Phases Completed (1-16a)
 
@@ -22,6 +22,7 @@ We have completed **Phase 16a** of the roadmap. **SpeechD-NG v0.4.0** now includ
 | 16c | 5.1 Surround Support | ✅ |
 | 18 | System Hardening | ✅ |
 | 19 | Local AI Brain Management | ✅ |
+| 20 | Native Whisper Backend (whisper.cpp) | ✅ |
 
 ## Release Artifacts
 
@@ -58,6 +59,14 @@ All release packages are collected in the `dist/` directory:
 
 - **Architecture**: `src/wyoming_bridge.py` communicates with `wyoming-faster-whisper`
 - **Config**: `stt_backend = "wyoming"` enables streaming ASR to remote/local servers
+- **Auto-Start**: Automatically spawns `wyoming-faster-whisper` if not running
+
+### Native Whisper Backend (Phase 20)
+
+- **Architecture**: `src/backends/whisper.rs` - Pure Rust via whisper-rs (whisper.cpp bindings)
+- **Config**: `stt_backend = "whisper"` for Python-free transcription
+- **GPU Support**: Auto-detects CUDA, uses GPU if available
+- **Model**: Downloads ggml models from Hugging Face
 
 ## D-Bus API Summary
 
@@ -142,9 +151,13 @@ piper_model = "en_GB-semaine-medium"
 piper_binary = "piper-tts"          # Use piper-tts to avoid conflict with mouse tool
 tts_backend = "piper"
 
-# STT (Vosk or Wyoming)
-stt_backend = "wyoming"
+# STT (Vosk, Wyoming, or native Whisper)
+stt_backend = "whisper"             # "vosk", "wyoming", or "whisper"
+whisper_model_path = "~/.cache/whisper/ggml-tiny.en.bin"
+whisper_language = "en"
 wyoming_host = "127.0.0.1"
+wyoming_auto_start = true
+wyoming_device = "cuda"             # "cpu" or "cuda"
 
 # Wake Word
 wake_word = "mango"
@@ -165,5 +178,5 @@ Pre-built packages available in `dist/`:
 
 - **GitHub**: <https://github.com/StarTuz/speechd-ng>
 - **Branch**: `main`
-- **Release**: v0.2.0
-- **Last Updated**: 2025-12-28
+- **Release**: v0.7.2
+- **Last Updated**: 2026-01-01

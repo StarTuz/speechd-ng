@@ -1,5 +1,6 @@
 pub mod espeak;
 pub mod piper;
+pub mod whisper;
 
 /// Represents a text-to-speech voice
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -15,7 +16,7 @@ pub trait SpeechBackend: Send + Sync {
     /// Returns the data (stdout) of the synthesis process or an error
     /// 'voice' is an optional specific voice ID to use
     fn synthesize(&self, text: &str, voice: Option<&str>) -> std::io::Result<Vec<u8>>;
-    
+
     /// Returns a list of supported voices installed locally
     fn list_voices(&self) -> std::io::Result<Vec<Voice>>;
 
@@ -26,6 +27,9 @@ pub trait SpeechBackend: Send + Sync {
 
     /// Downloads a voice given its ID (optional)
     fn download_voice(&self, _voice_id: &str) -> std::io::Result<()> {
-        Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "Downloading not supported for this backend"))
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "Downloading not supported for this backend",
+        ))
     }
 }

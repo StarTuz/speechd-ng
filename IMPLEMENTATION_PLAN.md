@@ -231,7 +231,7 @@ The Wyoming protocol allows streaming audio to external ASR servers (like `wyomi
 
 #### 13.2 Server Management
 
-- [ ] Auto-start local wyoming-whisper if configured
+- [x] Auto-start local wyoming-whisper if configured
 - [ ] Health check and reconnection logic
 
 #### 13.3 Configuration

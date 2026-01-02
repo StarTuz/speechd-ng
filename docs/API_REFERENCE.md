@@ -2,6 +2,8 @@
 
 This document provides a complete reference for GUI developers and integrators who want to interact with the SpeechD-NG daemon via D-Bus.
 
+> **Note:** For command-line usage, see the [CLI Manual](CLI_MANUAL.md).
+
 ## Connection Details
 
 | Property | Value |
@@ -801,12 +803,6 @@ Switch the AI model at runtime without restarting the daemon.
 
 ```bash
 busctl --user call org.speech.Service /org/speech/Service org.speech.Service SetBrainModel s "llama3:latest"
-```
-
-**CLI Example:**
-
-```bash
-speechd-control brain use llama3:latest
 ```
 
 **Parameters:**

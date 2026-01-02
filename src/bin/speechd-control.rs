@@ -55,6 +55,12 @@ enum Commands {
         remote: bool,
     },
 
+    /// Download a voice
+    Download {
+        /// Voice ID to download (e.g., piper:en_US-lessac-medium)
+        voice: String,
+    },
+
     /// Play audio from URL
     Play {
         /// URL to audio file
@@ -243,7 +249,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     for (id, desc) in voices {
                         println!("  {} ({})", id, desc);
                     }
-                    println!("\nTo download: speechd-control voice download <id>");
+                    println!("\nTo download: speechd-control download <id>");
                 }
             } else {
                 let voices: Vec<(String, String)> = conn
@@ -260,6 +266,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         println!("  {} ({})", name, id);
                     }
                 }
+            }
+        }
+
+        Commands::Download { voice } => {
+            println!("Downloading voice '{}'...", voice);
+            let result: String = conn
+                .call_method(Some(dest), path, Some(iface), "DownloadVoice", &voice)?
+                .body()
+                .deserialize()?;
+
+            if result == "Success" {
+                println!("✓ Download complete");
+            } else {
+                eprintln!("✗ Error: {}", result);
+                std::process::exit(1);
             }
         }
 

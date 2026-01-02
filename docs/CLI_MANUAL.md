@@ -50,6 +50,9 @@ speechd-control voices
 
 # List voices available for download
 speechd-control voices --remote
+
+# Download a specific voice
+speechd-control download piper:en_US-lessac-medium
 ```
 
 ## Audio Playback

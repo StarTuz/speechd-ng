@@ -1,4 +1,4 @@
-Name:           speechserverdaemon
+Name:           speechd-ng
 Version:        0.7.2
 Release:        1%{?dist}
 Summary:        Next-generation Linux speech daemon with AI integration
@@ -34,7 +34,7 @@ mkdir -p %{buildroot}%{_libdir}/speechd-ng
 mkdir -p %{buildroot}/usr/lib/systemd/user
 mkdir -p %{buildroot}%{_docdir}/%{name}
 
-install -m 755 target/release/speechserverdaemon %{buildroot}%{_bindir}/
+install -m 755 target/release/speechd-ng %{buildroot}%{_bindir}/
 install -m 755 src/wakeword_bridge.py %{buildroot}%{_libdir}/speechd-ng/
 install -m 755 src/wyoming_bridge.py %{buildroot}%{_libdir}/speechd-ng/
 install -m 644 systemd/speechd-ng.service %{buildroot}/usr/lib/systemd/user/
@@ -42,12 +42,15 @@ install -m 644 systemd/speechd-ng.service %{buildroot}/usr/lib/systemd/user/
 %files
 %license LICENSE
 %doc README.md
-%{_bindir}/speechserverdaemon
+%{_bindir}/speechd-ng
 %{_libdir}/speechd-ng/wakeword_bridge.py
 %{_libdir}/speechd-ng/wyoming_bridge.py
 /usr/lib/systemd/user/speechd-ng.service
 
 %changelog
+* Thu Jan 02 2025 StarTuz <startuz@example.com> - 0.7.2-1
+- Renamed binary from speechserverdaemon to speechd-ng for consistency
+
 * Sat Dec 28 2024 StarTuz <startuz@example.com> - 0.2.0-1
 - Release v0.2.0: Complete Phase 14 with full CI hardening
 - Added Ping diagnostic method

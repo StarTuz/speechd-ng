@@ -5,8 +5,9 @@ Since `speechd-ng` is designed as a modern daemon, it defaults to running in the
 ## 1. Installation
 
 Copy the binary to a global location:
+
 ```bash
-cp target/release/speechserverdaemon /usr/local/bin/speechd-ng
+cp target/release/speechd-ng /usr/local/bin/speechd-ng
 chmod +x /usr/local/bin/speechd-ng
 ```
 
@@ -61,6 +62,7 @@ exit 0
 ## 3. Permissions
 
 Make the script executable:
+
 ```bash
 chmod +x /etc/init.d/speechd-ng
 ```
@@ -77,8 +79,10 @@ fi
 ```
 
 ## 5. Security Note regarding SysV
+
 Unlike Systemd, SysV does not provide automatic sandboxing (PrivateTmp, etc.).
 To secure the daemon on SysV:
-1.  Run as a dedicated user (create `speech` user).
-2.  Use `jail` or `chroot` approaches if paranoia is required.
-3.  Ensure `/tmp` has restricted permissions only if needed.
+
+1. Run as a dedicated user (create `speech` user).
+2. Use `jail` or `chroot` approaches if paranoia is required.
+3. Ensure `/tmp` has restricted permissions only if needed.

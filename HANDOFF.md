@@ -28,10 +28,10 @@ We have completed **Phase 16a** of the roadmap. **SpeechD-NG v0.4.0** now includ
 All release packages are collected in the `dist/` directory:
 
 - **Master Archive**: `dist/speechd-ng-v0.7.2.tar.gz` (Includes installer + all packages)
-- **Debian**: `dist/speechserverdaemon_0.7.2-1_amd64.deb`
-- **RPM**: `dist/speechserverdaemon-0.7.2-1.x86_64.rpm`
+- **Debian**: `dist/speechd-ng_0.7.2-1_amd64.deb`
+- **RPM**: `dist/speechd-ng-0.7.2-1.x86_64.rpm`
 - **Flatpak**: `dist/org.speech.Service-0.7.2.flatpak`
-- **Binary**: `target/release/speechserverdaemon`
+- **Binary**: `target/release/speechd-ng`
 
 ## Functional Features
 
@@ -156,8 +156,8 @@ Pre-built packages available in `dist/`:
 
 | Package | Format | For |
 |---------|--------|-----|
-| `speechserverdaemon_0.2.0-1_amd64.deb` | Debian | Ubuntu, Debian, Mint |
-| `speechserverdaemon-0.2.0-1.x86_64.rpm` | RPM | Fedora, openSUSE, RHEL |
+| `speechd-ng_0.2.0-1_amd64.deb` | Debian | Ubuntu, Debian, Mint |
+| `speechd-ng-0.2.0-1.x86_64.rpm` | RPM | Fedora, openSUSE, RHEL |
 | `org.speech.Service-0.2.0.flatpak` | Flatpak | Universal Linux |
 
 ## Repository

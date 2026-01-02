@@ -1,4 +1,4 @@
 [D-BUS Service]
 Name=org.speech.Service
-Exec=/home/startux/Code/speechserverdaemon/target/debug/speechserverdaemon
+Exec=/home/startux/Code/speechd-ng/target/debug/speechd-ng
 SystemdService=speechd-ng.service

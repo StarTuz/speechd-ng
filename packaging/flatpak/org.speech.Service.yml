@@ -2,7 +2,7 @@ app-id: org.speech.Service
 runtime: org.freedesktop.Platform
 runtime-version: '23.08'
 sdk: org.freedesktop.Sdk
-command: speechserverdaemon
+command: speechd-ng
 finish-args:
   # D-Bus Service Export
   - --socket=session-bus
@@ -22,12 +22,12 @@ modules:
   - name: speechd-ng
     buildsystem: simple
     build-commands:
-      - install -Dm755 speechserverdaemon /app/bin/speechserverdaemon
+      - install -Dm755 speechd-ng /app/bin/speechd-ng
       - install -Dm755 wakeword_bridge.py /app/lib/speechd-ng/wakeword_bridge.py
       - install -Dm755 wyoming_bridge.py /app/lib/speechd-ng/wyoming_bridge.py
     sources:
       - type: file
-        path: ../../target/release/speechserverdaemon
+        path: ../../target/release/speechd-ng
       - type: file
         path: ../../src/wakeword_bridge.py
       - type: file

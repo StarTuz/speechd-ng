@@ -48,7 +48,7 @@ cargo build --release
 
 # Manual Installation
 # Copy binary
-cp target/release/speechserverdaemon ~/.local/bin/
+cp target/release/speechd-ng ~/.local/bin/
 
 # Copy Python bridges (Required for Wake Word & Wyoming)
 cp src/wakeword_bridge.py ~/.local/bin/
@@ -58,6 +58,12 @@ chmod +x ~/.local/bin/*.py
 # Install systemd service
 cp systemd/speechd-ng.service ~/.config/systemd/user/
 systemctl --user daemon-reload
+
+# Create required directories (Critical for sandboxing)
+mkdir -p ~/.local/share/piper/models
+mkdir -p ~/.local/share/speechd-ng
+mkdir -p ~/Documents
+
 systemctl --user enable --now speechd-ng
 ```
 

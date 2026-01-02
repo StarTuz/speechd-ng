@@ -5,7 +5,7 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/home/startux/.local/bin/speechserverdaemon
+ExecStart=%h/.local/bin/speechd-ng
 Restart=on-failure
 BusName=org.speech.Service
 Environment=RUST_LOG=info

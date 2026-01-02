@@ -17,16 +17,19 @@ This is a major milestone release marking the completion of all 14 development p
 ## ✨ New Features (Phase 14)
 
 ### Diagnostics & Safety
+
 - **`Ping()` Method**: Simple D-Bus connectivity check for monitoring and scripting
 - **Improved Error Handling**: Graceful degradation when audio hardware or AI backends are unavailable
 - **Rollback Support**: Undo accidental voice pattern learning with `RollbackLastCorrection()`
 
 ### CI/CD Hardening
+
 - **Offline Resilience Tests**: Daemon survives network outages and missing audio devices
 - **D-Bus Introspection**: Automatic interface validation in CI pipelines
 - **Latency Benchmarking**: Performance test suite in `benchmarks/`
 
 ### Packaging
+
 - **Debian Package**: `.deb` via `cargo-deb` with systemd integration
 - **Flatpak Manifest**: Ready for Flathub submission
 - **Systemd Service**: User-level service with 20+ security directives
@@ -36,16 +39,18 @@ This is a major milestone release marking the completion of all 14 development p
 ## 📦 Installation
 
 ### From Source
+
 ```bash
 cargo build --release
-cp target/release/speechserverdaemon ~/.local/bin/
+cp target/release/speechd-ng ~/.local/bin/
 ```
 
 ### Debian Package
+
 ```bash
 cargo install cargo-deb
 cargo deb
-sudo dpkg -i target/debian/speechserverdaemon_0.2.0_amd64.deb
+sudo dpkg -i target/debian/speechd-ng_0.2.0_amd64.deb
 ```
 
 ---
@@ -62,17 +67,20 @@ sudo dpkg -i target/debian/speechserverdaemon_0.2.0_amd64.deb
 ## 📋 Full Changelog
 
 ### Added
+
 - `Ping()` D-Bus method for diagnostics
 - Offline resilience CI workflow
 - D-Bus introspection in CI for interface validation
 - Latency benchmark suite (`benchmarks/latency_test.py`)
 
 ### Changed
+
 - Downgraded `zbus` to 4.4.0 for macro stability
 - Explicit CamelCase D-Bus method naming (no more auto-conversion issues)
 - Improved error messages for headless environments
 
 ### Fixed
+
 - D-Bus method discovery issues in headless CI
 - Audio stream panics when no hardware present
 - Configuration loading panics for missing optional fields

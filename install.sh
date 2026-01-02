@@ -26,7 +26,7 @@ fi
 # 2. Locate Package
 echo "[*] Locating Package..."
 if [ "$DISTRO" == "debian" ]; then
-    PKG=$(find dist -name "speechserverdaemon_*_amd64.deb" | sort -V | tail -n1)
+    PKG=$(find dist -name "speechd-ng_*_amd64.deb" | sort -V | tail -n1)
     if [ -z "$PKG" ]; then
         echo "Error: No .deb package found in dist/"
         exit 1
@@ -36,7 +36,7 @@ if [ "$DISTRO" == "debian" ]; then
     sudo apt-get update
     sudo apt-get install -y espeak-ng python3 libasound2
 elif [ "$DISTRO" == "redhat" ]; then
-    PKG=$(find dist -name "speechserverdaemon-*.x86_64.rpm" | sort -V | tail -n1)
+    PKG=$(find dist -name "speechd-ng-*.x86_64.rpm" | sort -V | tail -n1)
     if [ -z "$PKG" ]; then
         echo "Error: No .rpm package found in dist/"
         exit 1
@@ -136,6 +136,11 @@ wyoming_auto_start = false
 EOF
 
 # 5. Service
+echo "[*] Ensuring required directories exist..."
+mkdir -p "$HOME/.local/share/piper/models"
+mkdir -p "$HOME/.local/share/speechd-ng"
+mkdir -p "$HOME/Documents"
+
 echo "[*] Enabling Service..."
 systemctl --user daemon-reload
 systemctl --user enable --now speechd-ng

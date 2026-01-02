@@ -5,6 +5,7 @@ This document outlines the next phases of development for SpeechD-NG, focused on
 ## Current Status
 
 **Phases 1-12**: ✅ Complete
+
 - Core D-Bus service, TTS engines, STT, LLM integration, wake word, passive learning, **manual training**, **import/export**, **ignored commands**, **VAD**
 
 ---
@@ -16,16 +17,19 @@ This document outlines the next phases of development for SpeechD-NG, focused on
 **Value**: High | **Effort**: Medium | **Priority**: ⭐ Highest
 
 ### Overview
+
 Users can teach the system words that ASR consistently mishears. Unlike passive learning (which requires LLM correction), manual training lets users directly associate ASR errors with intended words.
 
 ### Implementation Steps
 
 #### 9.1 Extend Fingerprint Module ✅
+
 - [x] Add `add_manual_correction(heard: String, meant: String)` method
 - [x] Manual corrections get higher base confidence (0.7 vs 0.3 for passive)
 - [x] Store source type: `"passive"` or `"manual"` per pattern
 
 #### 9.2 Add D-Bus Training Methods ✅
+
 - [x] `TrainWord(expected: String, duration_secs: u32) -> (heard: String, success: bool)`
   - Records audio for `duration_secs`
   - Transcribes using STT
@@ -39,15 +43,18 @@ Users can teach the system words that ASR consistently mishears. Unlike passive 
   - Quick overview of learning status
 
 #### 9.3 Training Feedback ✅
+
 - [x] Return what ASR actually heard for user verification
 - [x] Speak confirmation: "I heard 'X'. I'll remember that means 'Y'."
 
 ### Files to Modify
+
 - `src/fingerprint.rs` - Add manual correction method
 - `src/main.rs` - Add D-Bus interface methods
 - `src/ear.rs` - Add short recording function for training
 
 ### Testing
+
 ```bash
 # Train a word
 busctl --user call org.speech.Service /org/speech/Service org.speech.Service TrainWord su "abba" 3
@@ -65,34 +72,41 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Add
 **Value**: Medium | **Effort**: Low | **Priority**: Easy Win
 
 ### Overview
+
 Fingerprint data is already stored as JSON. Expose D-Bus methods to export/import this data.
 
 ### Implementation Steps
 
 #### 10.1 Export Method ✅
+
 - [x] `ExportFingerprint(path: String) -> bool`
   - Exports fingerprint data to specified path
   - Returns success status
 
 #### 10.2 Import Method ✅
+
 - [x] `ImportFingerprint(path: String, merge: bool) -> u32`
   - If `merge=true`: Adds patterns from file to existing (doesn't overwrite)
   - If `merge=false`: Replaces current fingerprint entirely
   - Returns count of patterns after import
 
 #### 10.3 Pattern Stats ✅ (Already implemented in Phase 9)
+
 - [x] `GetFingerprintStats() -> (manual_count, passive_count, command_count)`
   - Quick overview of fingerprint status
 
 #### 10.4 Additional Helper ✅
+
 - [x] `GetFingerprintPath() -> String`
   - Returns path to fingerprint data file
 
 ### Files to Modify
+
 - `src/fingerprint.rs` - Add export/import/stats methods
 - `src/main.rs` - Add D-Bus interface methods
 
 ### Testing
+
 ```bash
 # Export
 busctl --user call org.speech.Service /org/speech/Service org.speech.Service ExportFingerprint s "/tmp/my_fingerprint.json"
@@ -110,17 +124,20 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Imp
 **Value**: Medium | **Effort**: Low | **Priority**: Debugging Helper
 
 ### Overview
+
 When the LLM can't resolve an ASR transcription to a meaningful command, store it for later review. Users or GUI tools can then manually add corrections.
 
 ### Implementation Steps
 
 #### 11.1 Track Failures in Fingerprint ✅
+
 - [x] Add `ignored_commands: Vec<IgnoredCommand>` to FingerprintData
 - [x] `IgnoredCommand { heard: String, timestamp: String, context: String }`
 - [x] Cap at 50 most recent
 - [x] Duplicate detection (don't add same command twice)
 
 #### 11.2 API Methods ✅
+
 - [x] `GetIgnoredCommands() -> Vec<(heard: String, timestamp: String, context: String)>`
 - [x] `ClearIgnoredCommands() -> u32` (returns count cleared)
 - [x] `CorrectIgnoredCommand(heard: String, meant: String) -> bool`
@@ -129,10 +146,12 @@ When the LLM can't resolve an ASR transcription to a meaningful command, store i
   - For testing/debugging
 
 #### 11.3 Integration ✅
+
 - [x] Cortex auto-adds commands when LLM returns "confused" or error responses
 - [x] Fingerprint auto-saves ignored commands with timestamps
 
 ### Files to Modify
+
 - `src/fingerprint.rs` - Add IgnoredCommand struct and methods
 - `src/cortex.rs` - Report failures to fingerprint
 - `src/main.rs` - Add D-Bus interface methods
@@ -146,11 +165,13 @@ When the LLM can't resolve an ASR transcription to a meaningful command, store i
 **Value**: Medium | **Effort**: Medium | **Priority**: Polish
 
 ### Overview
+
 Replace fixed 4-second recording with energy-based VAD that starts when speech is detected and stops after silence.
 
 ### Implementation Steps
 
 #### 12.1 VAD Parameters (Configurable) ✅
+
 ```toml
 # Speech.toml
 vad_speech_threshold = 500      # Energy level to detect speech start
@@ -160,21 +181,25 @@ vad_max_duration_ms = 15000     # Maximum recording length
 ```
 
 #### 12.2 Implement in Ear Module ✅
+
 - [x] Add `record_with_vad()` function alongside `record_and_transcribe()`
 - [x] Calculate RMS energy per 10ms audio chunk
 - [x] State machine: WAITING → SPEAKING → SILENCE_DETECTED → DONE
 - [x] Configurable thresholds via Settings
 
 #### 12.3 Wake Word Mode ✅
+
 - [x] Autonomous mode now uses `record_with_vad()`
 - [x] Waits for speech start (doesn't record silence)
 - [x] Ends recording when user stops speaking naturally
 - [x] Says "I didn't hear anything" if no speech detected
 
 #### 12.4 D-Bus API ✅
+
 - [x] `ListenVad()` - VAD-based listening method
 
 ### Files to Modify
+
 - `src/ear.rs` - Implement VAD logic
 - `src/config_loader.rs` - Add VAD settings
 
@@ -187,24 +212,30 @@ vad_max_duration_ms = 15000     # Maximum recording length
 **Value**: High | **Effort**: High | **Priority**: Future Phase
 
 ### Overview
+
 The Wyoming protocol allows streaming audio to external ASR servers (like `wyoming-whisper`). This enables:
+
 - GPU-accelerated transcription on a separate machine
 - Larger/more accurate Whisper models
 - Shared ASR infrastructure
 
 ### Implementation Steps
+
 *(Detailed planning TBD when prioritized)*
 
 #### 13.1 Wyoming Client
+
 - [ ] Implement AsyncTcpClient wrapper
 - [ ] AudioStart/AudioChunk/AudioStop events
 - [ ] Transcript event handling
 
 #### 13.2 Server Management
+
 - [ ] Auto-start local wyoming-whisper if configured
 - [ ] Health check and reconnection logic
 
 #### 13.3 Configuration
+
 ```toml
 stt_backend = "wyoming"  # or "vosk"
 wyoming_host = "127.0.0.1"
@@ -230,8 +261,9 @@ wyoming_auto_start = true
 ## Getting Started
 
 To begin Phase 9:
+
 ```bash
-cd /home/startux/Code/speechserverdaemon
+cd /home/startux/Code/speechd-ng
 # Review fingerprint module
 cat src/fingerprint.rs
 ```
@@ -245,11 +277,11 @@ cat src/fingerprint.rs
 **Value**: Medium | **Effort**: Medium
 
 ### Requirements
+
 - `PlayAudio(url: String)` method
 - Support for playback status events (Started, Finished)
 - Volume control and cancellation
 
 ---
-
 
 *Last Updated: 2025-12-29*

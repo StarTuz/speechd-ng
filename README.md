@@ -47,8 +47,9 @@ cargo build --release
 ./install.sh
 
 # Manual Installation
-# Copy binary
+# Copy binaries
 cp target/release/speechd-ng ~/.local/bin/
+cp target/release/speechd-control ~/.local/bin/
 
 # Copy Python bridges (Required for Wake Word & Wyoming)
 cp src/wakeword_bridge.py ~/.local/bin/

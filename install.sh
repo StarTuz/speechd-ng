@@ -5,102 +5,162 @@ set -e
 
 CONFIG_DIR="$HOME/.config/speechd-ng"
 CONFIG_FILE="$CONFIG_DIR/Speech.toml"
+BIN_DIR="$HOME/.local/bin"
+SYSTEMD_DIR="$HOME/.config/systemd/user"
 
 echo "========================================"
-echo "   SpeechD-NG Installer (v0.7.1)"
+echo "   SpeechD-NG Installer (v0.7.2)"
 echo "========================================"
 
-# 1. Detect Distribution
-echo "[*] Detecting Distribution..."
-if [ -f /etc/debian_version ]; then
-    DISTRO="debian"
-    echo "    Detected: Debian/Ubuntu based"
-elif [ -f /etc/redhat-release ]; then
-    DISTRO="redhat"
-    echo "    Detected: Fedora/RHEL based"
+# Check if we're in the project directory with built binaries
+if [ -f "target/release/speechd-ng" ]; then
+    INSTALL_MODE="source"
+    echo "[*] Detected source installation mode"
 else
-    echo "    Unknown distribution. Proceeding with manual package selection?"
-    exit 1
+    INSTALL_MODE="package"
+    echo "[*] Detected package installation mode"
 fi
 
-# 2. Locate Package
-echo "[*] Locating Package..."
-if [ "$DISTRO" == "debian" ]; then
-    PKG=$(find dist -name "speechd-ng_*_amd64.deb" | sort -V | tail -n1)
-    if [ -z "$PKG" ]; then
-        echo "Error: No .deb package found in dist/"
+if [ "$INSTALL_MODE" == "source" ]; then
+    # Source Installation
+    echo "[*] Installing from source..."
+    
+    mkdir -p "$BIN_DIR"
+    mkdir -p "$SYSTEMD_DIR"
+    
+    # Copy binaries
+    echo "    Installing speechd-ng..."
+    cp target/release/speechd-ng "$BIN_DIR/"
+    
+    if [ -f "target/release/speechd-control" ]; then
+        echo "    Installing speechd-control..."
+        cp target/release/speechd-control "$BIN_DIR/"
+    fi
+    
+    # Copy Python bridges
+    if [ -f "src/wakeword_bridge.py" ]; then
+        echo "    Installing Python bridges..."
+        cp src/wakeword_bridge.py "$BIN_DIR/"
+        cp src/wyoming_bridge.py "$BIN_DIR/"
+        chmod +x "$BIN_DIR"/*.py
+    fi
+    
+    # Copy systemd service
+    echo "    Installing systemd service..."
+    cp systemd/speechd-ng.service "$SYSTEMD_DIR/"
+    
+else
+    # Package Installation
+    echo "[*] Detecting Distribution..."
+    if [ -f /etc/debian_version ]; then
+        DISTRO="debian"
+        echo "    Detected: Debian/Ubuntu based"
+    elif [ -f /etc/redhat-release ]; then
+        DISTRO="redhat"
+        echo "    Detected: Fedora/RHEL based"
+    else
+        echo "    ERROR: Unknown distribution."
+        echo "    Please build from source: cargo build --release && ./install.sh"
         exit 1
     fi
-    INSTALL_CMD="sudo apt-get install -y ./$PKG"
-    # Ensure dependencies
-    sudo apt-get update
-    sudo apt-get install -y espeak-ng python3 libasound2
-elif [ "$DISTRO" == "redhat" ]; then
-    PKG=$(find dist -name "speechd-ng-*.x86_64.rpm" | sort -V | tail -n1)
-    if [ -z "$PKG" ]; then
-        echo "Error: No .rpm package found in dist/"
+
+    echo "[*] Locating Package..."
+    if [ "$DISTRO" == "debian" ]; then
+        # Try new name first, fall back to old name
+        PKG=$(find dist -name "speechd-ng_*_amd64.deb" 2>/dev/null | sort -V | tail -n1)
+        if [ -z "$PKG" ]; then
+            PKG=$(find dist -name "speechserverdaemon_*_amd64.deb" 2>/dev/null | sort -V | tail -n1)
+        fi
+        if [ -z "$PKG" ]; then
+            echo "Error: No .deb package found in dist/"
+            echo "Build from source first: cargo build --release"
+            exit 1
+        fi
+        INSTALL_CMD="sudo apt-get install -y ./$PKG"
+        sudo apt-get update
+        sudo apt-get install -y espeak-ng python3 libasound2
+    elif [ "$DISTRO" == "redhat" ]; then
+        PKG=$(find dist -name "speechd-ng-*.x86_64.rpm" 2>/dev/null | sort -V | tail -n1)
+        if [ -z "$PKG" ]; then
+            PKG=$(find dist -name "speechserverdaemon-*.x86_64.rpm" 2>/dev/null | sort -V | tail -n1)
+        fi
+        if [ -z "$PKG" ]; then
+            echo "Error: No .rpm package found in dist/"
+            echo "Build from source first: cargo build --release"
+            exit 1
+        fi
+        INSTALL_CMD="sudo dnf install -y ./$PKG"
+    fi
+
+    echo "    Found: $PKG"
+    read -p "    Install this package? [Y/n] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ -n $REPLY ]]; then
+        echo "Aborting installation."
         exit 1
     fi
-    INSTALL_CMD="sudo dnf install -y ./$PKG"
+
+    echo "[*] Installing Package..."
+    $INSTALL_CMD
 fi
 
-echo "    Found: $PKG"
-read -p "    Install this package? [Y/n] " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]] && [[ -n $REPLY ]]; then
-    echo "Aborting installation."
-    exit 1
-fi
-
-# 3. Install Package
-echo "[*] Installing Package..."
-$INSTALL_CMD
-
-# 4. Configuration
+# Configuration Wizard
 echo "[*] Configuration Wizard"
 mkdir -p "$CONFIG_DIR"
 
-# Defaults
-WAKE_WORD="hey_jarvis"
-ENABLE_AI="false"
-STT_BACKEND="vosk"
-
-# Wake Word
-echo
-echo "--- Wake Word Selection ---"
-echo "1) Hey Jarvis (default)"
-echo "2) Alexa"
-echo "3) Computer"
-echo "4) Custom (enter manually)"
-read -p "Select [1-4]: " ww_choice
-case $ww_choice in
-    2) WAKE_WORD="alexa" ;;
-    3) WAKE_WORD="computer" ;;
-    4) read -p "Enter custom wake word (snake_case): " WAKE_WORD ;;
-    *) WAKE_WORD="hey_jarvis" ;;
-esac
-
-# AI
-echo
-echo "--- AI Integration ---"
-read -p "Enable Ollama integration? (requires local Ollama) [y/N]: " ai_choice
-if [[ $ai_choice =~ ^[Yy]$ ]]; then
-    ENABLE_AI="true"
+# Skip config wizard if config already exists
+if [ -f "$CONFIG_FILE" ]; then
+    echo "    Configuration already exists at $CONFIG_FILE"
+    read -p "    Overwrite? [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "    Keeping existing configuration."
+        SKIP_CONFIG=true
+    fi
 fi
 
-# STT
-echo
-echo "--- Speech to Text ---"
-echo "1) Vosk (Local, Embedded)"
-echo "2) Wyoming (Remote/Home Assistant)"
-read -p "Select [1-2]: " stt_choice
-if [ "$stt_choice" == "2" ]; then
-    STT_BACKEND="wyoming"
-fi
+if [ "$SKIP_CONFIG" != "true" ]; then
+    # Defaults
+    WAKE_WORD="hey_jarvis"
+    ENABLE_AI="false"
+    STT_BACKEND="vosk"
 
-# Write Config
-echo "[*] Writing configuration to $CONFIG_FILE..."
-cat > "$CONFIG_FILE" <<EOF
+    # Wake Word
+    echo
+    echo "--- Wake Word Selection ---"
+    echo "1) Hey Jarvis (default)"
+    echo "2) Alexa"
+    echo "3) Computer"
+    echo "4) Custom (enter manually)"
+    read -p "Select [1-4]: " ww_choice
+    case $ww_choice in
+        2) WAKE_WORD="alexa" ;;
+        3) WAKE_WORD="computer" ;;
+        4) read -p "Enter custom wake word (snake_case): " WAKE_WORD ;;
+        *) WAKE_WORD="hey_jarvis" ;;
+    esac
+
+    # AI
+    echo
+    echo "--- AI Integration ---"
+    read -p "Enable Ollama integration? (requires local Ollama) [y/N]: " ai_choice
+    if [[ $ai_choice =~ ^[Yy]$ ]]; then
+        ENABLE_AI="true"
+    fi
+
+    # STT
+    echo
+    echo "--- Speech to Text ---"
+    echo "1) Vosk (Local, Embedded)"
+    echo "2) Wyoming (Remote/Home Assistant)"
+    read -p "Select [1-2]: " stt_choice
+    if [ "$stt_choice" == "2" ]; then
+        STT_BACKEND="wyoming"
+    fi
+
+    # Write Config
+    echo "[*] Writing configuration to $CONFIG_FILE..."
+    cat > "$CONFIG_FILE" <<EOF
 # SpeechD-NG Configuration
 # Generated by install.sh on $(date)
 
@@ -134,13 +194,15 @@ wyoming_model = "tiny-int8"
 wyoming_auto_start = false
 
 EOF
+fi
 
-# 5. Service
+# Ensure directories exist
 echo "[*] Ensuring required directories exist..."
 mkdir -p "$HOME/.local/share/piper/models"
 mkdir -p "$HOME/.local/share/speechd-ng"
 mkdir -p "$HOME/Documents"
 
+# Enable service
 echo "[*] Enabling Service..."
 systemctl --user daemon-reload
 systemctl --user enable --now speechd-ng
@@ -149,10 +211,13 @@ echo "========================================"
 echo "   Installation Complete!"
 echo "========================================"
 echo
-echo "Your configuration has been saved to:"
-echo "   $CONFIG_FILE"
+echo "Binaries installed to: $BIN_DIR"
+echo "Configuration saved to: $CONFIG_FILE"
 echo
-echo "You can edit this file manually at any time to change settings."
+echo "Commands available:"
+echo "  speechd-ng       - The daemon (runs as systemd service)"
+echo "  speechd-control  - CLI control utility"
+echo
 echo "To restart the service after changes, run:"
 echo "   systemctl --user restart speechd-ng"
 echo

@@ -49,7 +49,11 @@ enum Commands {
     Version,
 
     /// List available voices
-    Voices,
+    Voices {
+        /// List downloadable voices instead of installed ones
+        #[arg(short, long)]
+        remote: bool,
+    },
 
     /// Play audio from URL
     Play {
@@ -224,19 +228,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("speechd-ng {}", result);
         }
 
-        Commands::Voices => {
-            let voices: Vec<(String, String)> = conn
-                .call_method(Some(dest), path, Some(iface), "ListVoices", &())?
-                .body()
-                .deserialize()?;
+        Commands::Voices { remote } => {
+            if remote {
+                let voices: Vec<(String, String)> = conn
+                    .call_method(Some(dest), path, Some(iface), "ListDownloadableVoices", &())?
+                    .body()
+                    .deserialize()?;
 
-            if voices.is_empty() {
-                println!("No voices installed");
+                if voices.is_empty() {
+                    println!("No downloadable voices found");
+                } else {
+                    println!("Downloadable Piper Voices");
+                    println!("─────────────────────────");
+                    for (id, desc) in voices {
+                        println!("  {} ({})", id, desc);
+                    }
+                    println!("\nTo download: speechd-control voice download <id>");
+                }
             } else {
-                println!("Installed Voices");
-                println!("────────────────");
-                for (id, name) in voices {
-                    println!("  {} ({})", name, id);
+                let voices: Vec<(String, String)> = conn
+                    .call_method(Some(dest), path, Some(iface), "ListVoices", &())?
+                    .body()
+                    .deserialize()?;
+
+                if voices.is_empty() {
+                    println!("No voices installed");
+                } else {
+                    println!("Installed Voices");
+                    println!("────────────────");
+                    for (id, name) in voices {
+                        println!("  {} ({})", name, id);
+                    }
                 }
             }
         }

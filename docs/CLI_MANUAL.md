@@ -47,6 +47,9 @@ speechd-control speak "Left speaker test" --channel left
 ```bash
 # List all installed voices
 speechd-control voices
+
+# List voices available for download
+speechd-control voices --remote
 ```
 
 ## Audio Playback

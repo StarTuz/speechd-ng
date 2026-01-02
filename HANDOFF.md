@@ -138,7 +138,8 @@ enable_ai = true                    # Toggle Cortex features
 passive_confidence_threshold = 0.1  # Threshold for auto-learning
 
 # TTS
-piper_model = "en_US-lessac-medium"
+piper_model = "en_GB-semaine-medium"
+piper_binary = "piper-tts"          # Use piper-tts to avoid conflict with mouse tool
 tts_backend = "piper"
 
 # STT (Vosk or Wyoming)

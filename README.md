@@ -30,7 +30,7 @@
 |---------|---------|
 | Rust (Stable) | Build the daemon |
 | `espeak-ng` | Fast synthesis fallback |
-| `piper` | High-quality neural synthesis |
+| `piper-tts` | High-quality neural synthesis (avoid `libratbag-piper`) |
 | `vosk` (pip) | Wake word and STT |
 | `Ollama` | AI brain (optional) |
 
@@ -211,12 +211,23 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Imp
 | 19 | Packaging (.deb, .rpm, .flatpak) | ✅ Complete |
 | 20 | Installer Script | ✅ Complete |
 
+## 🎤 Piper TTS Setup
+
+### Binary Conflict Warning
+
+On some distributions (like Arch Linux/Garuda), the command `piper` refers to a gaming mouse configuration tool (`libratbag`). To use neural TTS, ensure you have the **neural engine** installed (often named `piper-tts` or found in AUR as `piper-tts-git`).
+
+Update your `Speech.toml` to point to the correct binary:
+
+```toml
+piper_binary = "piper-tts"  # Or full path: /usr/bin/piper-tts
+```
+
 ## 🔒 Security
 
-- **Systemd Sandboxing**: 20+ security directives
+- **Systemd Sandboxing**: 20+ security directives (note: requires `%t/dconf` access for some Piper versions)
 - **Polkit Integration**: Permission checks on sensitive operations
-- **Read-Only Home**: Writes only to specific directories
-- **No Network Abuse**: Restricted to localhost and Hugging Face
+- **Read-Only Home**: Writes only to specific directories (Models are stored in `~/.local/share/piper/models`)
 
 ## 📝 License
 

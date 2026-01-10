@@ -21,6 +21,14 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y libdbus-1-dev espeak-ng libasound2-dev pkg-config dbus-x11 alsa-utils python3-dbus libssl-dev cmake build-essential
+        
+    - name: Install libvosk
+      run: |
+        wget https://github.com/alphacephei/vosk-api/releases/download/v0.3.45/vosk-linux-x86_64-0.3.45.zip
+        unzip vosk-linux-x86_64-0.3.45.zip
+        sudo cp vosk-linux-x86_64-0.3.45/libvosk.so /usr/lib/x86_64-linux-gnu/
+        sudo cp vosk-linux-x86_64-0.3.45/vosk_api.h /usr/include/
+        sudo ldconfig
 
     - name: Cache Cargo registry
       uses: actions/cache@v3

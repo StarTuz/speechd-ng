@@ -20,7 +20,7 @@ jobs:
     - name: Install System Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libdbus-1-dev espeak-ng libasound2-dev pkg-config dbus-x11 alsa-utils python3-dbus
+        sudo apt-get install -y libdbus-1-dev espeak-ng libasound2-dev pkg-config dbus-x11 alsa-utils python3-dbus libssl-dev cmake build-essential
 
     - name: Cache Cargo registry
       uses: actions/cache@v3

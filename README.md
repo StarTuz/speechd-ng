@@ -1,5 +1,7 @@
 # SpeechD-NG: The Next-Generation Linux Speech Daemon
 
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg) ![Status](https://img.shields.io/badge/status-stable-green.svg)
+
 **SpeechD-NG** is a modern, secure, and intelligent speech service designed for the Linux ecosystem. It replaces the aging `speech-dispatcher` with a window-manager agnostic, high-performance, and AI-ready architecture.
 
 ## 🚀 Mission

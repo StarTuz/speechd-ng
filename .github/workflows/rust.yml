@@ -27,17 +27,18 @@ jobs:
         pip install vosk
         VOSK_DIR=$(python3 -c "import os, vosk; print(os.path.dirname(vosk.__file__))")
         echo "Found vosk at $VOSK_DIR"
-        sudo cp "$VOSK_DIR/libvosk.so" /usr/lib/x86_64-linux-gnu/
-        wget https://raw.githubusercontent.com/alphacephei/vosk-api/v0.3.45/src/vosk_api.h
-        sudo cp vosk_api.h /usr/include/
+        find "$VOSK_DIR" -name "libvosk.so"
+        sudo cp "$VOSK_DIR/libvosk.so" /usr/local/lib/libvosk.so
+        sudo cp "$VOSK_DIR/libvosk.so" /usr/lib/libvosk.so
         sudo ldconfig
-        ls -l /usr/lib/x86_64-linux-gnu/libvosk.so
+        ls -l /usr/local/lib/libvosk.so
+        ls -l /usr/lib/libvosk.so
 
     - name: Configure Cargo Linker
       run: |
         mkdir -p .cargo
         echo '[target.x86_64-unknown-linux-gnu]' > .cargo/config.toml
-        echo 'rustflags = ["-L", "native=/usr/lib/x86_64-linux-gnu"]' >> .cargo/config.toml
+        echo 'rustflags = ["-L", "native=/usr/local/lib"]' >> .cargo/config.toml
         cat .cargo/config.toml
 
     - name: Cache Cargo registry

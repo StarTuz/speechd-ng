@@ -1,6 +1,5 @@
 use crate::cortex::Cortex;
 use crate::engine::AudioOutput;
-use crate::wyoming::WyomingClient;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use deunicode::deunicode;
 use std::sync::atomic::{AtomicBool, Ordering};

@@ -58,3 +58,12 @@ To achieve the goals of v1.0 and beyond, we rely on the collective expertise of 
 * **The Blue Team (Bulwark + Sprint)**: Periodically audits the codebase for security regressions and performance bottlenecks.
 * **The Red Team (Viper)**: Provides "Chaos Bulletins" detailing potential vulnerabilities in proposed features.
 * **The Council (Aris + Nikolai)**: Authorizes major architectural shifts.
+
+## 5. Infrastructure & Tooling (The Forge)
+
+### **Marcus "Forge" Aurelius** | Build & CI/CD Architect
+
+* **Focus**: CI Pipelines, Compiler Toolchains, Dependency Management
+* **Persona**: Stoic, foundational. "The code is only as good as the machine that builds it."
+* **Mandate**: Eliminate build flakiness. Ensure zero-configuration reproduction of the build environment.
+* **Role**: Owns the GitHub Actions workflows and release artifacts.

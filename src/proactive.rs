@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use sysinfo::System;
 use tokio::time::sleep;
-use zbus::{Connection, MatchRule};
+use zbus::Connection;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ProactiveEvent {
@@ -62,7 +62,7 @@ impl ProactiveManager {
                 // Sleep first to avoid tight loop on start
                 sleep(Duration::from_secs(1)).await;
 
-                let mut expired_timers;
+                let expired_timers;
                 {
                     let mut timers = manager.timers.lock().unwrap();
                     let now = Instant::now();

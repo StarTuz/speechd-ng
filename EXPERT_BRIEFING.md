@@ -138,3 +138,23 @@ The expert committee has completed its initial review of the SpeechD-NG codebase
 1. **Manual Config Injection**: We should consider a local patch to the `Config` struct or a manually-crafted `config.json` that bridges the gap between the Hugging Face weights and the `candle` implementation.
 2. **Stable Checkpoint Hosting**: It is requested that the council identify or host a verified "Candle-Safe" Moondream 2 checkpoint to prevent future breakage from upstream model updates.
 3. **Rustup compatibility**: Ensure the `candle` dependencies remain pinned to 0.8.0 until a higher version stabilizes the Moondream config schema.
+
+---
+
+## ⚙️ Infrastructure & Build Report
+
+**Expert**: Marcus "Forge" Aurelius
+
+### **Findings** (CRITICAL)
+
+* **CI Linker Integrity**: **FAILED**. The `rust-lld` linker in the GitHub Actions environment consistently rejects `libvosk.so` when placed in custom directories, despite environment variable overrides (`LIBRARY_PATH`, `LD_LIBRARY_PATH`).
+* **Dependency Availability**: **FAILED**. The anticipated `wget` target for `vosk-api` v0.3.45 zip returned 404, breaking the build.
+* **Resolution**: Employed the "Shotgun Strategy":
+    1.  **Artifact Source**: Switches to `pip install vosk` (Python Wheel) which is strictly version-controlled and highly available, guaranteeing a valid `libvosk.so` binary.
+    2.  **Path Redundancy**: Copies the shared object to *both* `/usr/lib` (Standard) and `/usr/local/lib` (User/Distro).
+    3.  **Config Injection**: Dynamically generates `.cargo/config.toml` to hard-code the native link flags, bypassing environment sanitization.
+
+### **Proposals**
+
+1.  **Vendor Native Deps**: Investigating checking in the `.so` files for `vosk` and `wyoming` directly into `lib/` to remove network dependency during build phases entirely.
+2.  **Containerize Build**: Move from a shell script runner to a custom Docker container image (`speechd-ng-builder`) that has `libvosk` pre-installed.

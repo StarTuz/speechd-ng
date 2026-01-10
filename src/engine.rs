@@ -15,7 +15,7 @@ use tokio::sync::oneshot;
 enum AudioMessage {
     PlayData {
         data: Vec<u8>,
-        voice: Option<String>,
+        _voice: Option<String>,
         complete: Option<oneshot::Sender<()>>,
         channel: Option<String>,
     },
@@ -60,7 +60,7 @@ pub trait AudioOutput: Send + Sync {
 pub struct AudioEngine {
     tx: MpscSender<AudioMessage>,
     backends: Arc<HashMap<String, Arc<dyn SpeechBackend>>>,
-    total_audio_buffer_size: Arc<AtomicUsize>,
+    _total_audio_buffer_size: Arc<AtomicUsize>,
 }
 
 #[async_trait::async_trait]
@@ -166,7 +166,7 @@ impl AudioEngine {
                 match msg {
                     AudioMessage::PlayData {
                         data,
-                        voice: _,
+                        _voice: _,
                         complete,
                         channel,
                     } => {
@@ -454,7 +454,7 @@ impl AudioEngine {
                     }
                     AudioMessage::PlayFetchedAudioChannel {
                         data,
-                        url,
+                        url: _,
                         channel,
                         resp_tx,
                     } => {
@@ -504,7 +504,7 @@ impl AudioEngine {
         Self {
             tx,
             backends,
-            total_audio_buffer_size,
+            _total_audio_buffer_size: total_audio_buffer_size,
         }
     }
 
@@ -540,7 +540,7 @@ impl AudioEngine {
                 if let Ok(Ok(data)) = res {
                     let _ = tx.send(AudioMessage::PlayData {
                         data,
-                        voice,
+                        _voice: voice,
                         complete: None,
                         channel: None,
                     });
@@ -582,7 +582,7 @@ impl AudioEngine {
                 if let Ok(Ok(data)) = res {
                     let _ = tx.send(AudioMessage::PlayData {
                         data,
-                        voice,
+                        _voice: voice,
                         complete: Some(complete_tx),
                         channel: None,
                     });
@@ -673,7 +673,7 @@ impl AudioEngine {
                 if let Ok(Ok(data)) = res {
                     let _ = tx.send(AudioMessage::PlayData {
                         data,
-                        voice,
+                        _voice: voice,
                         complete: None,
                         channel: Some(channel),
                     });

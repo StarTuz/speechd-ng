@@ -1,5 +1,4 @@
 use crate::chronicler::Chronicler;
-use crate::context::EnvironmentalContext;
 use crate::fingerprint::Fingerprint;
 use crate::vision::{TheEye, VisionHelper};
 use lazy_static::lazy_static;
@@ -54,13 +53,13 @@ enum CortexMessage {
     Observe(String), // Passive: Just listen and remember
     Query {
         prompt: String,
-        asr_heard: Option<String>,
-        images: Option<Vec<String>>,
+        _asr_heard: Option<String>,
+        _images: Option<Vec<String>>,
         response_tx: Sender<String>,
     }, // Active: Ask a question about context
     QueryStream {
         prompt: String,
-        asr_heard: Option<String>,
+        _asr_heard: Option<String>,
         images: Option<Vec<String>>,
         token_tx: Sender<String>,
     },
@@ -136,6 +135,7 @@ impl Cortex {
             while let Some(msg) = rx.recv().await {
                 match msg {
                     CortexMessage::Observe(text) => {
+                        let text = sanitize_input(&text);
                         println!("Cortex observing: {}", text);
                         if let Ok(mut mem) = memory.lock() {
                             mem.add(text.clone());
@@ -149,6 +149,7 @@ impl Cortex {
                         prompt,
                         response_tx,
                     } => {
+                        let prompt = sanitize_input(&prompt);
                         let image_result = VisionHelper::capture_screen();
                         match image_result {
                             Ok(bytes) => match eye.describe_image(&bytes, &prompt) {
@@ -168,10 +169,11 @@ impl Cortex {
                     }
                     CortexMessage::Query {
                         prompt,
-                        asr_heard: _,
-                        images: _,
+                        _asr_heard: _,
+                        _images: _,
                         response_tx,
                     } => {
+                        let prompt = sanitize_input(&prompt);
                         // Check if AI is enabled
                         let ai_enabled = crate::config_loader::SETTINGS
                             .read()
@@ -233,7 +235,7 @@ impl Cortex {
                     }
                     CortexMessage::QueryStream {
                         prompt,
-                        asr_heard: _,
+                        _asr_heard: _,
                         images,
                         token_tx,
                     } => {
@@ -305,8 +307,8 @@ impl Cortex {
             .tx
             .send(CortexMessage::Query {
                 prompt,
-                asr_heard: None,
-                images: None,
+                _asr_heard: None,
+                _images: None,
                 response_tx: resp_tx,
             })
             .await;
@@ -325,8 +327,8 @@ impl Cortex {
             .tx
             .send(CortexMessage::Query {
                 prompt,
-                asr_heard: None,
-                images,
+                _asr_heard: None,
+                _images: images,
                 response_tx: resp_tx,
             })
             .await;
@@ -346,7 +348,7 @@ impl Cortex {
             .tx
             .send(CortexMessage::QueryStream {
                 prompt,
-                asr_heard: None,
+                _asr_heard: None,
                 images,
                 token_tx,
             })

@@ -17,19 +17,39 @@ impl VisionHelper {
 
         let raw_bytes = if session_type.contains("WAYLAND") {
             if desktop.contains("KDE") {
-                if let Ok(_output) = Self::capture_kde_wayland() {
-                    _output
-                } else {
-                    // Fallback if KDE Wayland capture fails
-                    Self::capture_grim_generic().or_else(|_| Self::capture_x11())?
+                match Self::capture_kde_wayland() {
+                    Ok(bytes) => bytes,
+                    Err(e) => {
+                        eprintln!("Vision: KDE capture failed: {}. Trying fallbacks...", e);
+                        Self::capture_grim_generic()
+                            .or_else(|_| Self::capture_x11())
+                            .map_err(|last_e| {
+                                format!(
+                                    "KDE capture failed ({}) and fallbacks failed too ({})",
+                                    e, last_e
+                                )
+                            })?
+                    }
                 }
             } else if desktop.contains("GNOME") || session_desktop.contains("GNOME") {
-                Self::capture_gnome()?
+                Self::capture_gnome().or_else(|e| {
+                    eprintln!("Vision: GNOME capture failed: {}. Trying fallbacks...", e);
+                    Self::capture_grim_generic().or_else(|_| Self::capture_x11())
+                })?
             } else if desktop.contains("SWAY") || desktop.contains("HYPRLAND") {
-                Self::capture_wlroots()?
+                Self::capture_wlroots().or_else(|e| {
+                    eprintln!("Vision: wlroots capture failed: {}. Trying fallbacks...", e);
+                    Self::capture_x11()
+                })?
             } else {
                 // Try generic Grim as fallback for other Wayland compositors
-                Self::capture_grim_generic().or_else(|_| Self::capture_x11())?
+                Self::capture_grim_generic().or_else(|e| {
+                    eprintln!(
+                        "Vision: Generic Wayland capture failed: {}. Trying X11 fallback...",
+                        e
+                    );
+                    Self::capture_x11()
+                })?
             }
         } else {
             Self::capture_x11()?
@@ -40,36 +60,59 @@ impl VisionHelper {
 
     fn capture_kde_wayland() -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
         // Try spectacle first
-        // spectacle -b (background) -n (non-notify) -o (output)
-        let output_path = "/tmp/speechd_vision_capture.png";
-        let status = Command::new("spectacle")
-            .args(&["-b", "-n", "-o", output_path])
-            .status();
+        let cache_dir = dirs::cache_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+        let speechd_cache = cache_dir.join("speechd-ng");
+        std::fs::create_dir_all(&speechd_cache)?;
+        let output_path = speechd_cache.join("vision_capture.png");
+        let output_path_str = output_path.to_string_lossy();
 
-        match status {
-            Ok(s) if s.success() => {
-                let bytes = std::fs::read(output_path)?;
-                let _ = std::fs::remove_file(output_path); // Cleanup
-                Ok(bytes)
+        let output = Command::new("spectacle")
+            .args(&["-b", "-n", "-o", &output_path_str])
+            .output();
+
+        match output {
+            Ok(o) if o.status.success() => {
+                if output_path.exists() {
+                    let bytes = std::fs::read(&output_path)?;
+                    let _ = std::fs::remove_file(&output_path); // Cleanup
+                    Ok(bytes)
+                } else {
+                    Err(format!(
+                        "Spectacle reported success but output file not found at {}",
+                        output_path_str
+                    )
+                    .into())
+                }
             }
-            _ => {
-                // Fallback to grim if spectacle fails or not installed
-                Self::capture_grim_generic()
+            Ok(o) => {
+                let stderr = String::from_utf8_lossy(&o.stderr);
+                Err(format!(
+                    "Spectacle failed with exit code {:?}: {}",
+                    o.status.code(),
+                    stderr
+                )
+                .into())
             }
+            Err(e) => Err(format!("Failed to start spectacle: {}", e).into()),
         }
     }
 
     fn capture_gnome() -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
         // gnome-screenshot -f /tmp/...
-        let output_path = "/tmp/speechd_vision_capture.png";
+        let cache_dir = dirs::cache_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+        let speechd_cache = cache_dir.join("speechd-ng");
+        std::fs::create_dir_all(&speechd_cache)?;
+        let output_path = speechd_cache.join("vision_capture_gnome.png");
+        let output_path_str = output_path.to_string_lossy();
+
         let status = Command::new("gnome-screenshot")
-            .args(&["-f", output_path])
+            .args(&["-f", &output_path_str])
             .status();
 
         match status {
             Ok(s) if s.success() => {
-                let bytes = std::fs::read(output_path)?;
-                let _ = std::fs::remove_file(output_path);
+                let bytes = std::fs::read(&output_path)?;
+                let _ = std::fs::remove_file(&output_path);
                 Ok(bytes)
             }
             _ => Err("GNOME screenshot failed".into()),
@@ -106,15 +149,20 @@ impl VisionHelper {
         }
 
         // Try scrot with temp file
-        let output_path = "/tmp/speechd_vision_capture.png";
+        let cache_dir = dirs::cache_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+        let speechd_cache = cache_dir.join("speechd-ng");
+        std::fs::create_dir_all(&speechd_cache)?;
+        let output_path = speechd_cache.join("vision_capture_x11.png");
+        let output_path_str = output_path.to_string_lossy();
+
         let status = Command::new("scrot")
-            .args(&["--overwrite", output_path])
+            .args(&["--overwrite", &output_path_str])
             .status();
 
         match status {
             Ok(s) if s.success() => {
-                let bytes = std::fs::read(output_path)?;
-                let _ = std::fs::remove_file(output_path);
+                let bytes = std::fs::read(&output_path)?;
+                let _ = std::fs::remove_file(&output_path);
                 Ok(bytes)
             }
             _ => Err("X11 capture failed (tried import and scrot)".into()),
@@ -195,6 +243,7 @@ impl TheEye {
         let img_tensor = self.preprocess_image(image_bytes)?;
 
         let model = self.model.as_mut().unwrap();
+        model.text_model.clear_kv_cache();
         let tokenizer = self.tokenizer.as_ref().unwrap();
 
         // Note: Generic normalization now handled in preprocess_image
@@ -202,9 +251,10 @@ impl TheEye {
         // Encode image
         let image_embeds = model.vision_encoder.forward(&img_tensor)?;
 
-        // Prepare prompt tokens
+        // Prepare prompt tokens - Moondream standard template
+        let formatted_prompt = format!("\n\nQuestion: {}\n\nAnswer:", prompt);
         let mut tokens = tokenizer
-            .encode(prompt, true)
+            .encode(formatted_prompt.as_str(), true)
             .map_err(|e| e.to_string())?
             .get_ids()
             .to_vec();
@@ -241,6 +291,17 @@ impl TheEye {
             };
 
             let logits = logits.squeeze(0)?.to_dtype(DType::F32)?;
+
+            // Apply repeat penalty
+            let repeat_penalty = 1.2f32;
+            let repeat_last_n = 64;
+            let start_at = tokens.len().saturating_sub(repeat_last_n);
+            let logits = candle_transformers::utils::apply_repeat_penalty(
+                &logits,
+                repeat_penalty,
+                &tokens[start_at..],
+            )?;
+
             let next_token = logits_processor.sample(&logits)?;
             tokens.push(next_token);
 
@@ -289,7 +350,7 @@ mod tests {
 
     #[test]
     fn test_adversarial_image_shapes() {
-        let mut vision = TheEye::new();
+        let vision = TheEye::new();
 
         // 1. Extreme aspect ratio (32:9 equivalent)
         let wide_img = image::DynamicImage::new_rgb8(3200, 900);

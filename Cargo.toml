@@ -1,6 +1,6 @@
 [package]
 name = "speechd-ng"
-version = "1.0.0"
+version = "1.0.2"
 edition = "2021"
 authors = ["StarTuz <startuz@example.com>"]
 description = "A modern, secure, next-generation speech server for Linux written in Rust."

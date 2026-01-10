@@ -9,8 +9,9 @@
 3. **Secure by Design**: Uses D-Bus for IPC with strict isolation and Polkit authorization.
 4. **AI-Ready**: Built to integrate with local LLMs (like Ollama) for contextual understanding.
 5. **Neural First**: First-class support for high-quality Piper neural voices.
-6. **Autonomous**: Integrated wake word detection for hands-free interaction.
+6. **Pure Rust Autonomous Mode**: Integrated native wake word detection (Wendy) for hands-free interaction.
 7. **Self-Improving**: Passive and manual voice learning to correct transcription errors over time.
+8. **Multimodal**: Can see and describe the screen via local computer vision (The Eye).
 
 ## 🏗 Architecture
 
@@ -18,8 +19,10 @@
 |-----------|-------------|
 | **The Daemon** | Rust + `zbus`. Lightweight D-Bus router. |
 | **Audio Engine** | Multi-backend mixer (eSpeak-ng + Piper). |
-| **The Ear** | Audio capture with offline STT (Vosk/Whisper). |
-| **The Cortex** | Async Ollama connector for AI "thinking". |
+| **The Ear** | Native audio capture with offline STT (Vosk/Whisper). Zero Python. |
+| **The Eye** | Local Vision Model (Moondream 2) for screen analysis. |
+| **The Cortex** | Async Ollama connector with token-based streaming. |
+| **The Chronicler** | Local vector database and embedding engine for long-term memory. |
 | **The Fingerprint** | Voice learning engine for STT error correction. |
 
 ## 🛠 Building & Installation
@@ -30,8 +33,8 @@
 |---------|---------|
 | Rust (Stable) | Build the daemon |
 | `espeak-ng` | Fast synthesis fallback |
-| `piper-tts` | High-quality neural synthesis (avoid `libratbag-piper`) |
-| `vosk` (pip) | Wake word and STT |
+| `piper-tts` | High-quality neural synthesis |
+| `libvosk` | Native headers for STT and Wake Word |
 | `Ollama` | AI brain (optional) |
 
 ### Build
@@ -50,11 +53,6 @@ cargo build --release
 # Copy binaries
 cp target/release/speechd-ng ~/.local/bin/
 cp target/release/speechd-control ~/.local/bin/
-
-# Copy Python bridges (Required for Wake Word & Wyoming)
-cp src/wakeword_bridge.py ~/.local/bin/
-cp src/wyoming_bridge.py ~/.local/bin/
-chmod +x ~/.local/bin/*.py
 
 # Install systemd service
 cp systemd/speechd-ng.service ~/.config/systemd/user/
@@ -88,13 +86,18 @@ stt_backend = "wyoming"             # "vosk" is default
 wyoming_host = "127.0.0.1"
 wyoming_port = 10301
 
-# Memory & Audio
-memory_size = 50
-enable_audio = true
-
 # Wake Word (Hands-Free Mode)
-wake_word = "mango"
+wake_word = "wendy"                 # Phonetically distinct generic default
 enable_wake_word = false
+
+# Memory & OOM Protection
+max_audio_size_mb = 50              # Protection against malicious Large-Payload ASR
+playback_timeout_secs = 30
+playback_volume = 1.0
+
+# Phase 5: Chronicler (Long-term Memory)
+enable_rag = true                   # Set to true to enable local memory
+rag_top_k = 3                       # Number of relevant memories to retrieve
 ```
 
 ## 📡 Quick Start
@@ -139,7 +142,7 @@ See **[docs/API_REFERENCE.md](docs/API_REFERENCE.md)** for the complete D-Bus AP
 
 When enabled, the daemon listens for a wake word and responds:
 
-1. Say "**Mango**" (or your configured wake word)
+1. Say "**Wendy**" (or your configured wake word)
 2. Daemon responds: "Yes?"
 3. Speak your command (4 second window)
 4. AI processes and responds via TTS
@@ -147,7 +150,7 @@ When enabled, the daemon listens for a wake word and responds:
 Enable in config:
 
 ```toml
-wake_word = "mango"
+wake_word = "wendy"
 enable_wake_word = true
 ```
 
@@ -184,32 +187,25 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Exp
 busctl --user call org.speech.Service /org/speech/Service org.speech.Service ImportFingerprint sb "/path/to/patterns.json" true
 ```
 
-## 🗺 Roadmap
+## 👁️ Vision (The Eye)
 
-| Phase | Feature | Status |
-|-------|---------|--------|
-| 1 | Foundation (D-Bus + Systemd) | ✅ Complete |
-| 2 | Audio Engine (rodio + eSpeak) | ✅ Complete |
-| 3 | The Cortex (Ollama + History) | ✅ Complete |
-| 4 | Security (Polkit + Sandbox) | ✅ Complete |
-| 5 | Premium Voices (Piper) | ✅ Complete |
-| 6 | Accessibility (STT + SSIP) | ✅ Complete |
-| 7 | Autonomous (Wake Word) | ✅ Complete |
-| 8 | Passive Learning | ✅ Complete |
-| 9 | Manual Training API | ✅ Complete |
-| 10 | Pattern Import/Export | ✅ Complete |
-| 11 | Ignored Commands | ✅ Complete |
-| 12 | Improved VAD | ✅ Complete |
-| 14 | Hardening & Packaging | ✅ Complete |
-| 15 | Streaming Media Player | ✅ Complete |
-| 16a | Multi-Channel Audio | ✅ Complete |
-| 16b | PipeWire Device Routing | ✅ Complete |
-| 16c | 5.1 Surround Support | ✅ Complete |
-| 17a | Polkit Enforcement | ✅ Complete |
-| 17b | Rate Limiting | ✅ Complete |
-| 18 | System Hardening | ✅ Complete |
-| 19 | Packaging (.deb, .rpm, .flatpak) | ✅ Complete |
-| 20 | Installer Script | ✅ Complete |
+The assistant can "see" your screen using a local Vision-Language Model (Moondream).
+
+### CLI Usage
+
+```bash
+# Describe the current screen
+speechd-control describe
+
+# Ask specific questions
+speechd-control describe "What is the error message in the terminal?"
+```
+
+### API Usage
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service DescribeScreen s "Describe this screen"
+```
 
 ## 🎤 Piper TTS Setup
 
@@ -223,11 +219,24 @@ Update your `Speech.toml` to point to the correct binary:
 piper_binary = "piper-tts"  # Or full path: /usr/bin/piper-tts
 ```
 
+## 👥 Team & Governance
+
+SpeechD-NG is guided by **The Council**, a committee of domain expert personas:
+
+- **AI & Models**: Dr. Aris Thorne (Inference efficiency & quantization)
+- **Systems & Latency**: Nikolai "Sprint" Volkov (Low-level performance & async Rust)
+- **Blue Team (Defense)**: Sloane "Bulwark" Vance (Hardening & security integration)
+- **Red Team (Offense)**: Kaelen "Viper" Cross (Adversarial testing & edge cases)
+- **UX & Accessibility**: Elara Vance (Human factors & VUI design)
+
+For more details on our governance model and expert mandates, see **[TEAM_EXPERTS.md](TEAM_EXPERTS.md)**.
+All contributions must adhere to our **[GUARDRAILS.md](GUARDRAILS.md)**.
+
 ## 🔒 Security
 
-- **Systemd Sandboxing**: 20+ security directives (note: requires `%t/dconf` access for some Piper versions)
-- **Polkit Integration**: Permission checks on sensitive operations
-- **Read-Only Home**: Writes only to specific directories (Models are stored in `~/.local/share/piper/models`)
+- **Systemd Sandboxing**: 20+ security directives. Note that `ProtectHome` and `PrivateDevices` are relaxed to allow screen capture and audio hardware access.
+- **Polkit Integration**: Permission checks on sensitive operations (`Think`, `Listen`, `DescribeScreen`).
+- **Isolation**: The daemon runs as a unprivileged user service.
 
 ## 📝 License
 

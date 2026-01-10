@@ -55,8 +55,6 @@ impl WhisperBackend {
 
     /// Transcribe audio from a WAV file
     pub fn transcribe(&self, wav_path: &str) -> Result<String, String> {
-        let start = std::time::Instant::now();
-
         // Load and convert audio
         let audio_data = self.load_audio(wav_path)?;
         println!(
@@ -64,6 +62,12 @@ impl WhisperBackend {
             audio_data.len(),
             wav_path
         );
+        self.transcribe_samples(&audio_data)
+    }
+
+    /// Transcribe raw audio samples (f32, mono, 16kHz)
+    pub fn transcribe_samples(&self, audio_data: &[f32]) -> Result<String, String> {
+        let start = std::time::Instant::now();
 
         // Get or load the model
         let ctx = self.get_or_init_context()?;
@@ -93,11 +97,8 @@ impl WhisperBackend {
 
         // Run inference - returns number of segments on success
         let _num_segments = state
-            .full(params, &audio_data)
+            .full(params, audio_data)
             .map_err(|e| format!("Transcription failed: {:?}", e))?;
-
-        // Get number of segments (for logging)
-        let _num_segments = state.full_n_segments();
 
         // Collect segments using as_iter()
         let mut text = String::new();

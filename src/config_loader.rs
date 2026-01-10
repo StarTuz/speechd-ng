@@ -13,6 +13,8 @@ pub struct Settings {
     pub piper_binary: String,
     pub tts_backend: String,
     pub memory_size: usize,
+    pub enable_rag: bool,
+    pub rag_top_k: usize,
     pub enable_audio: bool,
     pub wake_word: String,
     pub enable_wake_word: bool,
@@ -31,10 +33,12 @@ pub struct Settings {
     // Native Whisper settings
     pub whisper_model_path: String, // Path to .bin model file
     pub whisper_language: String,   // "en", "auto", etc.
+    pub vosk_model_path: String,
     // Media Player Settings (Phase 15)
-    pub max_audio_size_mb: u64,     // Max audio file download size in MB
+    pub max_audio_size_mb: u64, // Max audio file download size in MB
+    pub global_audio_buffer_limit_mb: u64, // Global limit for all audio buffers
     pub playback_timeout_secs: u64, // Timeout for audio downloads
-    pub playback_volume: f32,       // Default volume (0.0 - 1.0)
+    pub playback_volume: f32,   // Default volume (0.0 - 1.0)
     // Rate Limiting Settings (Phase 17b)
     pub rate_limit_tts: u32,    // TTS requests per minute
     pub rate_limit_ai: u32,     // AI/Think requests per minute
@@ -53,8 +57,10 @@ impl Default for Settings {
             piper_binary: "piper".to_string(),
             tts_backend: "espeak".to_string(),
             memory_size: 50,
+            enable_rag: true,
+            rag_top_k: 3,
             enable_audio: true,
-            wake_word: "startuz".to_string(),
+            wake_word: "wendy".to_string(),
             enable_wake_word: false,
             // VAD defaults
             vad_speech_threshold: 500,
@@ -74,8 +80,10 @@ impl Default for Settings {
                 std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
             ),
             whisper_language: "en".to_string(),
+            vosk_model_path: "/usr/share/vosk/model".to_string(),
             // Media Player defaults (Phase 15)
             max_audio_size_mb: 50,
+            global_audio_buffer_limit_mb: 200,
             playback_timeout_secs: 30,
             playback_volume: 1.0,
             // Rate Limiting defaults (Phase 17b)
@@ -104,8 +112,10 @@ impl Settings {
             .set_default("piper_binary", "piper")?
             .set_default("tts_backend", "espeak")?
             .set_default("memory_size", 50)?
+            .set_default("enable_rag", true)?
+            .set_default("rag_top_k", 3)?
             .set_default("enable_audio", true)?
-            .set_default("wake_word", "startuz")?
+            .set_default("wake_word", "wendy")?
             .set_default("enable_wake_word", false)?
             // VAD defaults
             .set_default("vad_speech_threshold", 500)?
@@ -128,8 +138,10 @@ impl Settings {
                 ),
             )?
             .set_default("whisper_language", "en")?
+            .set_default("vosk_model_path", "/usr/share/vosk/model")?
             // Media Player defaults (Phase 15)
             .set_default("max_audio_size_mb", 50)?
+            .set_default("global_audio_buffer_limit_mb", 200)?
             .set_default("playback_timeout_secs", 30)?
             .set_default("playback_volume", 1.0)?
             // Rate Limiting defaults (Phase 17b)

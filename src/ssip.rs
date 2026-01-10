@@ -1,9 +1,9 @@
-use tokio::net::TcpListener;
+use crate::engine::AudioOutput;
+use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use std::sync::{Arc, Mutex};
-use crate::engine::AudioEngine;
+use tokio::net::TcpListener;
 
-pub async fn start_server(engine: Arc<Mutex<AudioEngine>>) {
+pub async fn start_server(engine: Arc<dyn AudioOutput + Send + Sync>) {
     // Attempt to bind to standard SSIP port with retries
     let mut retries = 5;
     let listener = loop {
@@ -11,7 +11,10 @@ pub async fn start_server(engine: Arc<Mutex<AudioEngine>>) {
             Ok(l) => break Some(l),
             Err(e) => {
                 if retries > 0 {
-                    eprintln!("SSIP Shim: Bind failed ({}), retrying in 500ms... ({} attempts left)", e, retries);
+                    eprintln!(
+                        "SSIP Shim: Bind failed ({}), retrying in 500ms... ({} attempts left)",
+                        e, retries
+                    );
                     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
                     retries -= 1;
                 } else {
@@ -26,7 +29,7 @@ pub async fn start_server(engine: Arc<Mutex<AudioEngine>>) {
         Some(l) => l,
         None => return,
     };
-    
+
     println!("SSIP Shim listening on 127.0.0.1:6560");
 
     loop {
@@ -44,7 +47,10 @@ pub async fn start_server(engine: Arc<Mutex<AudioEngine>>) {
     }
 }
 
-async fn handle_connection(mut socket: tokio::net::TcpStream, engine: Arc<Mutex<AudioEngine>>) -> std::io::Result<()> {
+async fn handle_connection(
+    mut socket: tokio::net::TcpStream,
+    engine: Arc<dyn AudioOutput + Send + Sync>,
+) -> std::io::Result<()> {
     let (reader, mut writer) = socket.split();
     let mut reader = BufReader::new(reader);
     let mut line = String::new();
@@ -60,8 +66,10 @@ async fn handle_connection(mut socket: tokio::net::TcpStream, engine: Arc<Mutex<
         }
 
         let cmd_line = line.trim();
-        if cmd_line.is_empty() { continue; }
-        
+        if cmd_line.is_empty() {
+            continue;
+        }
+
         let cmd_parts: Vec<&str> = cmd_line.split_whitespace().collect();
         let cmd = cmd_parts[0].to_uppercase();
 
@@ -71,16 +79,18 @@ async fn handle_connection(mut socket: tokio::net::TcpStream, engine: Arc<Mutex<
                 // SET SELF CLIENT_NAME|LANGUAGE|...
                 // We acknowledge everything to keep client happy
                 writer.write_all(b"200 OK\r\n").await?;
-            },
+            }
             "SPEAK" => {
                 // Enter data mode
                 writer.write_all(b"202 OK RECEIVING DATA\r\n").await?;
-                
+
                 let mut text_buffer = String::new();
                 loop {
                     let mut data_line = String::new();
-                    if reader.read_line(&mut data_line).await? == 0 { break; }
-                    
+                    if reader.read_line(&mut data_line).await? == 0 {
+                        break;
+                    }
+
                     let trimmed = data_line.trim();
                     if trimmed == "." {
                         break;
@@ -88,19 +98,17 @@ async fn handle_connection(mut socket: tokio::net::TcpStream, engine: Arc<Mutex<
                     // Handle ".." escaping? SSIP says: NO, just "." on single line ends it.
                     text_buffer.push_str(&data_line);
                 }
-                
+
                 // Speak it
                 println!("SSIP Speaking: {}", text_buffer);
-                if let Ok(e) = engine.lock() {
-                    e.speak(&text_buffer, None);
-                }
-                
+                engine.speak(&text_buffer, None);
+
                 writer.write_all(b"200 OK MESSAGE QUEUED\r\n").await?;
-            },
+            }
             "QUIT" => {
                 writer.write_all(b"231 HAPPY HACKING\r\n").await?;
                 return Ok(());
-            },
+            }
             _ => {
                 // Ignore unknown commands with OK to prevent client crash
                 // Or maybe 200 OK? Or generic error?

@@ -37,13 +37,14 @@
 1. **D-Bus**: All methods are exposed on the Session Bus.
 2. **Polkit**: Sensitive methods (`TrainWord`, `DownloadVoice`, `Listen`, `ManageBrain`, `Think`) check `org.speech.service.*` permissions.
 3. **Systemd Sandbox**:
-    - `ProtectSystem=strict`
-    - `ProtectHome=read-only` (Whitelisted: `~/.local/share/speechd-ng`, `~/Documents`)
+    - `ProtectSystem=full`
+    - `ProtectHome=false` (Required for desktop session tools like `spectacle`, `grim`, and `import` to capture the screen; also for Hugging Face cache access)
     - `PrivateTmp=true`
+    - `PrivateDevices=false` (Required for audio hardware access via PortAudio/CPAL)
 
 ## 5. ASR Poisoning (Passive Learning)
 
-**Risk**: hallucinated corrections might enforce bad patterns.
+**Risk**: Hallucinated corrections might enforce bad patterns.
 **Mitigation**:
 
 - **Confidence**: Passive patterns have lower confidence than manual training.
@@ -51,11 +52,20 @@
 - **Auditing**: Configuration `passive_confidence_threshold` controls sensitivity.
 - **Safety**: `RollbackLastCorrection` method allows undoing the last learning event.
 
-## 6. Action Items (Technical Debt)
+## 6. Multimodal Awareness (The Eye)
+
+**Component**: `src/vision.rs`
+
+- **Screenshot Logic**: Auto-detects session (X11/Wayland/KDE/Gnome) and uses native tools (`spectacle`, `grim`, `import`).
+- **Processing**: Uses `candle-transformers` (v0.8.0).
+- **Compatibility Fix**: Bypasses unstable `config.json` files via manual `Config::v2()` injection and uses stable `moondream1` weights for deterministic tensor naming.
+- **Memory**: Vision engine is only loaded on demand and stays in memory for indexed lookups to avoid cold-start lag.
+- **Rate-Limiting**: Restricted to 10 requests per minute to prevent OOM/CPU thrashing.
+
+## 7. Action Items (Technical Debt)
 
 - [x] Create `.deb` / `.rpm` packaging scripts.
 - [x] Add `enable_ai = false` config option.
 - [x] Implement `Rollback` and specialized "Safety" UI.
 - [x] Benchmark suite for latency measurements.
-- [x] **CI**: Add explicit offline-mode test to verification pipeline.
-- [x] **Management**: Native D-Bus control for AI service lifecycle (Phase 19).
+- [x] **Vision Integration**: Cross-desktop screenshot capture and local analysis (v0.7.2).

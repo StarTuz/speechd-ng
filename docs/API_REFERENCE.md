@@ -22,7 +22,7 @@ busctl --user introspect org.speech.Service /org/speech/Service
 
 ## Core / Diagnostic Methods
 
-### `Ping() → String` (Phase 14)
+### `Ping() → String`
 
 Diagnostic method to verify D-Bus connectivity.
 
@@ -34,7 +34,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Pin
 
 ---
 
-### `GetVersion() → String` (Phase 14)
+### `GetVersion() → String`
 
 Get the daemon version string.
 
@@ -144,7 +144,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Lis
 
 ---
 
-### `ListenVad() → String` (Phase 12)
+### `ListenVad() → String`
 
 Record audio with Voice Activity Detection - waits for speech, records until silence.
 
@@ -172,7 +172,7 @@ vad_max_duration_ms = 15000     # Maximum recording length
 
 ---
 
-## Voice Training Methods (Phase 9)
+## Voice Training Methods
 
 ### `AddCorrection(heard: String, meant: String) → bool`
 
@@ -259,7 +259,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 
 ---
 
-## Pattern Import/Export (Phase 10)
+## Pattern Import/Export
 
 ### `ExportFingerprint(path: String) → bool`
 
@@ -315,7 +315,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 
 ---
 
-## Ignored Commands Tracking (Phase 11)
+## Ignored Commands Tracking
 
 ### `GetIgnoredCommands() → Vec<(heard: String, timestamp: String, context: String)>`
 
@@ -379,7 +379,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Add
 
 ---
 
-## Configuration (Phase 13)
+## Configuration
 
 ### `GetSttBackend() → String`
 
@@ -393,7 +393,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 
 ---
 
-### `GetStatus() → (bool, f32, String, u32)`
+### `GetStatus() → (ai_enabled: bool, passive_threshold: f32, stt_backend: String, patterns_count: u32, rag_enabled: bool)`
 
 Returns a diagnostic summary:
 
@@ -401,10 +401,11 @@ Returns a diagnostic summary:
 2. `passive_threshold` (f32): Confidence threshold for passive learning.
 3. `stt_backend` (String): Current STT backend.
 4. `patterns_count` (u32): Total number of learned voice patterns.
+5. `rag_enabled` (bool): Is the Chronicler (RAG) active?
 
 ---
 
-### `GetWyomingInfo() → (host: String, port: u16, model: String, auto_start: bool)`
+### `GetWyomingInfo() → (host: String, port: u16, model: String, auto_start: bool, device: String)`
 
 Get configuration details for the Wyoming protocol integration.
 
@@ -418,6 +419,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 - `port`: Wyoming server port (e.g., `10301`)
 - `model`: Configured Whisper model (e.g., `tiny`, `base`)
 - `auto_start`: Whether the server is auto-started
+- `device`: The targeted capture device
 
 ---
 
@@ -436,7 +438,7 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Che
 
 ---
 
-## Streaming Media Player (Phase 15)
+## Streaming Media Player
 
 ### `PlayAudio(url: String) → String`
 
@@ -523,16 +525,20 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 
 ---
 
-## Rate Limiting (Phase 17b)
+## Rate Limiting
 
 To prevent abuse, the daemon enforces rate limits per D-Bus sender.
 
-| Method Type | Default Limit | Protected Methods |
+| Category | Default Limit | Methods |
 |-------------|---------------|-------------------|
-| **TTS** | 30/min | `Speak`, `SpeakVoice`, `SpeakChannel` |
-| **AI** | 10/min | `Think` |
+| **Core** | 60/min | `Ping`, `GetVersion`, `GetStatus` |
+| **TTS** | 30/min | `Speak`, `SpeakVoice`, `ListVoices`, `ListDownloadableVoices`, `DownloadVoice`, `SetVolume`, `GetVolume` |
+| **AI** | 10/min | `Think`, `Listen`, `ListenVad`, `SetWakeWord` |
 | **Audio** | 20/min | `PlayAudio`, `PlayAudioChannel` |
-| **Listen** | 30/min | `Listen`, `ListenVad` |
+| **Brain Mgmt** | 10/min | `GetBrainStatus`, `ManageBrain`, `SetBrainModel` |
+| **Training** | 30/min | `AddCorrection`, `TrainWord`, `ListPatterns`, `GetFingerprintStats` |
+| **Import/Export** | 5/min | `ExportFingerprint`, `ImportFingerprint`, `GetFingerprintPath` |
+| **Ignored** | 30/min | `GetIgnoredCommands`, `CorrectIgnoredCommand`, `ClearIgnoredCommands` |
 
 **Behavior:**
 
@@ -541,7 +547,7 @@ To prevent abuse, the daemon enforces rate limits per D-Bus sender.
 
 ---
 
-## Multi-Channel Audio (Phase 16a/16c)
+## Multi-Channel Audio
 
 ### `SpeakChannel(text: String, voice: String, channel: String) → bool`
 
@@ -594,7 +600,7 @@ List available audio channels configurations.
 
 ---
 
-## PipeWire Device Routing (Phase 16b)
+## PipeWire Device Routing
 
 ### `ListSinks() → Vec<(id: u32, name: String, desc: String, is_default: bool)>`
 
@@ -749,7 +755,7 @@ fn main() -> zbus::Result<()> {
 
 ---
 
-## Local AI (Ollama) Management (Phase 19)
+## Local AI (Ollama) Management
 
 These methods allow clients to monitor and control the local reasoning engine (Ollama).
 
@@ -797,25 +803,43 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Man
 
 ---
 
-### `SetBrainModel(model: String) → Bool`
+### `SetBrainModel(model_name: String) → Bool`
 
-Switch the AI model at runtime without restarting the daemon.
+Switch the LLM model used by the Cortex at runtime.
 
 ```bash
-busctl --user call org.speech.Service /org/speech/Service org.speech.Service SetBrainModel s "llama3:latest"
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service SetBrainModel s "phi3:latest"
+```
+
+---
+
+## Multimodal / Vision Methods
+
+### `DescribeScreen(prompt: String) → String`
+
+Capture the current screen and describe it using the local vision model (The Eye).
+
+```bash
+busctl --user call org.speech.Service /org/speech/Service org.speech.Service DescribeScreen s "What is on the screen?"
 ```
 
 **Parameters:**
 
-- `model`: Model name to switch to (e.g., `"llama3:latest"`, `"mistral:latest"`).
+- `prompt`: The question or instruction for the vision model (e.g., "Describe this screen", "Is there a clock visible?").
 
-**Returns:** `true` if the model was switched successfully.
+**Returns:**
 
-**Notes:**
+- Text description of the visual scene.
 
-- Does not validate model availability (trusts user input).
-- Change persists until daemon restart; to persist permanently, update `Speech.toml`.
-- Check available models with `GetBrainStatus()`.
+**Security:**
+
+- Requires `org.speech.service.think` Polkit authorization.
+- Rate limited (Default: 10/min).
+
+**System Requirements:**
+
+- Requires `spectacle` (KDE), `grim` (Sway/Hyprland), or `gnome-screenshot` to be installed for capture.
+- Requires Moondream model weights in `~/.cache/huggingface`.
 
 ---
 
@@ -837,13 +861,13 @@ journalctl --user -u speechd-ng -f
 ## Security Notes
 
 1. **Polkit Authorization**: Sensitive methods check permissions via `zbus_polkit`.
-   - `DownloadVoice`, `TrainWord`, `Think`, `Listen`: Require `org.speech.service.*` privileges.
+   - `DownloadVoice`, `TrainWord`, `Think`, `Listen`, `DescribeScreen`: Require `org.speech.service.*` privileges.
    - **Active Desktop**: Typically auto-allowed.
    - **Remote/SSH**: Requires admin authentication.
 2. **Rate Limiting**: Enforced per sender unique name (e.g., `:1.55`) to prevent DoS.
-3. **Systemd Sandboxing**: The service runs with strict filesystem restrictions (`ProtectSystem=strict`, `ProtectHome=read-only`).
+3. **Systemd Sandboxing**: The service runs with strict filesystem restrictions (`ProtectSystem=full`), but `ProtectHome=false` and `PrivateDevices=false` are set to allow interaction with desktop tools and audio hardware.
 4. **Export Paths**: Only specific directories are writable (e.g., `~/.local/share/speechd-ng/`).
 
 ---
 
-*Last Updated: 2025-12-30 (v0.7.2)*
+*Last Updated: 2026-01-09 (v0.7.2)*

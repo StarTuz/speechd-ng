@@ -19,10 +19,10 @@ impl TokenBucket {
             last_update: Instant::now(),
         }
     }
-    
+
     fn try_consume(&mut self, tokens: f32) -> bool {
         self.refill();
-        
+
         if self.tokens >= tokens {
             self.tokens -= tokens;
             true
@@ -30,7 +30,7 @@ impl TokenBucket {
             false
         }
     }
-    
+
     fn refill(&mut self) {
         let now = Instant::now();
         let elapsed = now.duration_since(self.last_update).as_secs_f32();
@@ -69,7 +69,7 @@ impl RateLimiter {
             listen_per_minute: listen as f32,
         }
     }
-    
+
     /// Check if request is allowed, consuming a token if so
     /// Returns true if allowed, false if rate limited
     pub fn check(&self, sender: &str, limit_type: LimitType) -> bool {
@@ -79,38 +79,38 @@ impl RateLimiter {
             LimitType::Audio => self.audio_per_minute,
             LimitType::Listen => self.listen_per_minute,
         };
-        
+
         // Use burst size = 1 minute worth
         let max_tokens = limit;
-        
+
         let mut buckets = self.buckets.lock().unwrap();
         let key = (sender.to_string(), limit_type);
-        
-        let bucket = buckets.entry(key).or_insert_with(|| {
-            TokenBucket::new(max_tokens, limit)
-        });
-        
+
+        let bucket = buckets
+            .entry(key)
+            .or_insert_with(|| TokenBucket::new(max_tokens, limit));
+
         bucket.try_consume(1.0)
     }
-    
+
     /// Get remaining tokens for a sender/type (for debugging/info)
     #[allow(dead_code)]
     pub fn remaining(&self, sender: &str, limit_type: LimitType) -> f32 {
         let buckets = self.buckets.lock().unwrap();
         let key = (sender.to_string(), limit_type);
-        
-        buckets.get(&key).map(|b| b.tokens).unwrap_or(self.tts_per_minute)
+
+        buckets
+            .get(&key)
+            .map(|b| b.tokens)
+            .unwrap_or(self.tts_per_minute)
     }
-    
+
     /// Clean up old entries (senders not seen recently)
-    #[allow(dead_code)]
     pub fn cleanup(&self, max_age_secs: u64) {
         let mut buckets = self.buckets.lock().unwrap();
         let now = Instant::now();
-        
-        buckets.retain(|_, bucket| {
-            now.duration_since(bucket.last_update).as_secs() < max_age_secs
-        });
+
+        buckets.retain(|_, bucket| now.duration_since(bucket.last_update).as_secs() < max_age_secs);
     }
 }
 

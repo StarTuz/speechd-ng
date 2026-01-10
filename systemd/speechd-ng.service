@@ -15,18 +15,16 @@ Environment=RUST_LOG=info
 # ========================
 
 # Filesystem Protection
-ProtectSystem=strict
-ProtectHome=read-only
+ProtectSystem=full
+ProtectHome=false
 PrivateTmp=true
-# Allow writing to Piper models directory and SpeechD-NG data
-ReadWritePaths=%h/.local/share/piper/models
-ReadWritePaths=%h/.local/share/speechd-ng
-ReadWritePaths=%h/Documents
+
+# Allow access to models (some are in cache)
+# BindReadOnlyPaths can be used for extra safety if ProtectHome=true, 
+# but for user service we'll stay simple for now.
 
 # Prevent privilege escalation
 NoNewPrivileges=true
-CapabilityBoundingSet=
-AmbientCapabilities=
 
 # Protect kernel and system configuration
 ProtectKernelTunables=true
@@ -36,28 +34,14 @@ ProtectControlGroups=true
 ProtectClock=true
 ProtectHostname=true
 
-# Restrict device access (audio still works via PipeWire/PulseAudio socket)
-PrivateDevices=true
+# Device access (needed for audio and potentially GPU/Screenshot)
+PrivateDevices=false
 
-# Network: Allow localhost (Ollama) and Hugging Face (Piper downloads)
+# Network: Allow localhost (Ollama) and Hubs
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-# IPAddressAllow/Deny does not support domain names in systemd!
-# To allow downloads, we must allow all outgoing traffic or use a proxy.
-# IPAddressAllow=localhost
-# IPAddressAllow=huggingface.co
-# IPAddressAllow=cdn-lfs.huggingface.co
-# IPAddressDeny=any
 
-# Restrict system calls to common set
-SystemCallArchitectures=native
-SystemCallFilter=@system-service clone3 rseq arch_prctl
-SystemCallFilter=~@privileged
-
-# Memory protection
-MemoryDenyWriteExecute=true
-LockPersonality=true
-RestrictRealtime=true
-RestrictSUIDSGID=true
+# Misc
+UMask=0077
 
 # Misc
 UMask=0077

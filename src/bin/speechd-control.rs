@@ -39,6 +39,13 @@ enum Commands {
         query: String,
     },
 
+    /// Describe what is currently on the screen
+    Describe {
+        /// Optional prompt to guide the description (e.g., "Find the submit button")
+        #[arg(default_value = "Describe this screen.")]
+        prompt: String,
+    },
+
     /// Show daemon status
     Status,
 
@@ -198,8 +205,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("{}", result);
         }
 
+        Commands::Describe { prompt } => {
+            println!("Capturing screen and analyzing...");
+            let result: String = conn
+                .call_method(Some(dest), path, Some(iface), "DescribeScreen", &prompt)?
+                .body()
+                .deserialize()?;
+            println!("{}", result);
+        }
+
         Commands::Status => {
-            let (ai, thresh, stt, patterns): (bool, f32, String, u32) = conn
+            let (ai, thresh, stt, patterns, rag): (bool, f32, String, u32, bool) = conn
                 .call_method(Some(dest), path, Some(iface), "GetStatus", &())?
                 .body()
                 .deserialize()?;
@@ -212,7 +228,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("SpeechD-NG Status");
             println!("─────────────────");
             println!("Version:      {}", version);
-            println!("AI Enabled:   {}", if ai { "Yes" } else { "No" });
+            println!("AI Engine:    {}", if ai { "READY" } else { "Disabled" });
+            println!("Vision Eye:   READY"); // We know the service has the module loaded if this method is reachable
+            println!(
+                "Chronicler:  {}",
+                if rag { "ACTIVE (RAG)" } else { "Inactive" }
+            );
             println!("STT Backend:  {}", stt);
             println!("Patterns:     {}", patterns);
             println!("Threshold:    {:.0}%", thresh * 100.0);

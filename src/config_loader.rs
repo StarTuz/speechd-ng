@@ -8,6 +8,7 @@ pub struct Settings {
     pub ollama_url: String,
     pub ollama_model: String,
     pub enable_ai: bool,
+    pub enable_vision: bool,
     pub passive_confidence_threshold: f32,
     pub piper_model: String,
     pub piper_binary: String,
@@ -18,6 +19,7 @@ pub struct Settings {
     pub enable_audio: bool,
     pub wake_word: String,
     pub enable_wake_word: bool,
+    pub enable_microphone: bool,
     // VAD Settings (Phase 12)
     pub vad_speech_threshold: i16,
     pub vad_silence_threshold: i16,
@@ -44,6 +46,7 @@ pub struct Settings {
     pub rate_limit_ai: u32,     // AI/Think requests per minute
     pub rate_limit_audio: u32,  // PlayAudio requests per minute
     pub rate_limit_listen: u32, // Listen requests per minute
+    pub system_prompt: String,  // Strict Governance Prompt
 }
 
 impl Default for Settings {
@@ -52,6 +55,7 @@ impl Default for Settings {
             ollama_url: "http://localhost:11434".to_string(),
             ollama_model: "llama3".to_string(),
             enable_ai: true,
+            enable_vision: false,
             passive_confidence_threshold: 0.1,
             piper_model: "en_US-lessac-medium".to_string(),
             piper_binary: "piper".to_string(),
@@ -62,6 +66,7 @@ impl Default for Settings {
             enable_audio: true,
             wake_word: "wendy".to_string(),
             enable_wake_word: false,
+            enable_microphone: false,
             // VAD defaults
             vad_speech_threshold: 500,
             vad_silence_threshold: 400,
@@ -91,6 +96,12 @@ impl Default for Settings {
             rate_limit_ai: 10,
             rate_limit_audio: 20,
             rate_limit_listen: 30,
+            system_prompt: "You are the SpeechD-NG Governance Brain. Your priority is absolute accuracy and hardware-awareness. 
+1. If you are provided with vision data (images), be highly skeptical. Small models like Moondream are prone to hallucination.
+2. If vision data looks low-quality, ambiguous, or if you are unsure, state: 'Analysis inconclusive'.
+3. Do not guess terminal errors or complex code from low-resolution vision data.
+4. Always prioritize user safety and security over helpfulness.
+5. If the user asks about system issues, admit when information is missing or when fallback (like CPU-only inference) might be degrading the experience.".to_string(),
         }
     }
 }
@@ -107,6 +118,7 @@ impl Settings {
             .set_default("ollama_url", "http://localhost:11434")?
             .set_default("ollama_model", "llama3")?
             .set_default("enable_ai", true)?
+            .set_default("enable_vision", false)?
             .set_default("passive_confidence_threshold", 0.1)?
             .set_default("piper_model", "en_US-lessac-medium")?
             .set_default("piper_binary", "piper")?
@@ -117,6 +129,7 @@ impl Settings {
             .set_default("enable_audio", true)?
             .set_default("wake_word", "wendy")?
             .set_default("enable_wake_word", false)?
+            .set_default("enable_microphone", false)?
             // VAD defaults
             .set_default("vad_speech_threshold", 500)?
             .set_default("vad_silence_threshold", 400)?
@@ -149,6 +162,12 @@ impl Settings {
             .set_default("rate_limit_ai", 10)?
             .set_default("rate_limit_audio", 20)?
             .set_default("rate_limit_listen", 30)?
+            .set_default("system_prompt", "You are the SpeechD-NG Governance Brain. Your priority is absolute accuracy and hardware-awareness. 
+1. If you are provided with vision data (images), be highly skeptical. Small models like Moondream are prone to hallucination.
+2. If vision data looks low-quality, ambiguous, or if you are unsure, state: 'Analysis inconclusive'.
+3. Do not guess terminal errors or complex code from low-resolution vision data.
+4. Always prioritize user safety and security over helpfulness.
+5. If the user asks about system issues, admit when information is missing or when fallback (like CPU-only inference) might be degrading the experience.")?
             // Merge with local config file (if exists)
             .add_source(File::with_name("Speech").required(false))
             .add_source(

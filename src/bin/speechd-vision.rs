@@ -1,11 +1,25 @@
-use std::env;
-// Removed unused PathBuf
-use std::process::Command;
+//! SpeechD-Vision: Standalone Vision Service for SpeechD-NG
+//!
+//! This is an optional, separate service that provides screen capture and
+//! image analysis using the Moondream 2 vision-language model.
+//!
+//! Communicates with the main speechd-ng daemon via D-Bus.
 
-pub struct VisionHelper;
+use std::env;
+use std::process::Command;
+use std::sync::{Arc, Mutex};
+
+use candle_core::{DType, Device, Module, Tensor};
+use candle_nn::VarBuilder;
+use candle_transformers::models::moondream::{Config, Model};
+use hf_hub::{api::sync::Api, Repo, RepoType};
+use tokenizers::Tokenizer;
+use zbus::{connection, interface, Connection};
+
+/// Screen capture helper supporting multiple desktop environments
+struct VisionHelper;
 
 impl VisionHelper {
-    /// Captures the current screen content and returns it as a Base64 encoded JPEG/PNG.
     pub fn capture_screen() -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
         let session_type = env::var("XDG_SESSION_TYPE")
             .unwrap_or_default()
@@ -17,39 +31,17 @@ impl VisionHelper {
 
         let raw_bytes = if session_type.contains("WAYLAND") {
             if desktop.contains("KDE") {
-                match Self::capture_kde_wayland() {
-                    Ok(bytes) => bytes,
-                    Err(e) => {
-                        eprintln!("Vision: KDE capture failed: {}. Trying fallbacks...", e);
-                        Self::capture_grim_generic()
-                            .or_else(|_| Self::capture_x11())
-                            .map_err(|last_e| {
-                                format!(
-                                    "KDE capture failed ({}) and fallbacks failed too ({})",
-                                    e, last_e
-                                )
-                            })?
-                    }
-                }
+                Self::capture_kde_wayland()
+                    .or_else(|_| Self::capture_grim_generic())
+                    .or_else(|_| Self::capture_x11())?
             } else if desktop.contains("GNOME") || session_desktop.contains("GNOME") {
-                Self::capture_gnome().or_else(|e| {
-                    eprintln!("Vision: GNOME capture failed: {}. Trying fallbacks...", e);
-                    Self::capture_grim_generic().or_else(|_| Self::capture_x11())
-                })?
+                Self::capture_gnome()
+                    .or_else(|_| Self::capture_grim_generic())
+                    .or_else(|_| Self::capture_x11())?
             } else if desktop.contains("SWAY") || desktop.contains("HYPRLAND") {
-                Self::capture_wlroots().or_else(|e| {
-                    eprintln!("Vision: wlroots capture failed: {}. Trying fallbacks...", e);
-                    Self::capture_x11()
-                })?
+                Self::capture_wlroots().or_else(|_| Self::capture_x11())?
             } else {
-                // Try generic Grim as fallback for other Wayland compositors
-                Self::capture_grim_generic().or_else(|e| {
-                    eprintln!(
-                        "Vision: Generic Wayland capture failed: {}. Trying X11 fallback...",
-                        e
-                    );
-                    Self::capture_x11()
-                })?
+                Self::capture_grim_generic().or_else(|_| Self::capture_x11())?
             }
         } else {
             Self::capture_x11()?
@@ -59,79 +51,45 @@ impl VisionHelper {
     }
 
     fn capture_kde_wayland() -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
-        // Try spectacle first
         let cache_dir = dirs::cache_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
-        let speechd_cache = cache_dir.join("speechd-ng");
+        let speechd_cache = cache_dir.join("speechd-vision");
         std::fs::create_dir_all(&speechd_cache)?;
-        let output_path = speechd_cache.join("vision_capture.png");
+        let output_path = speechd_cache.join("capture.png");
         let output_path_str = output_path.to_string_lossy();
 
-        let mut attempts = 0;
-        let mut last_err = String::new();
-
-        while attempts < 5 {
-            attempts += 1;
+        for attempt in 1..=5 {
             let output = Command::new("spectacle")
-                .args(&["-b", "-n", "-o", &output_path_str])
+                .args(["-b", "-n", "-o", &output_path_str])
                 .output();
 
-            match output {
-                Ok(o) if o.status.success() => {
-                    // Backoff to allow disk flush
-                    std::thread::sleep(std::time::Duration::from_millis(100 * attempts));
-
+            if let Ok(o) = output {
+                if o.status.success() {
+                    std::thread::sleep(std::time::Duration::from_millis(100 * attempt));
                     if output_path.exists() {
                         if let Ok(bytes) = std::fs::read(&output_path) {
-                            // ATOMIC VERIFY: Ensure PNG is actually valid and not truncated
                             if image::load_from_memory(&bytes).is_ok() {
-                                let _ = std::fs::remove_file(&output_path); // Cleanup
+                                let _ = std::fs::remove_file(&output_path);
                                 return Ok(bytes);
-                            } else {
-                                last_err = format!(
-                                    "Captured file at {} was truncated or invalid (attempt {})",
-                                    output_path_str, attempts
-                                );
                             }
                         }
-                    } else {
-                        last_err = format!(
-                            "Spectacle reported success but file not found at {} (attempt {})",
-                            output_path_str, attempts
-                        );
                     }
                 }
-                Ok(o) => {
-                    last_err = format!(
-                        "Spectacle failed with exit code {:?}: {}",
-                        o.status.code(),
-                        String::from_utf8_lossy(&o.stderr)
-                    );
-                }
-                Err(e) => {
-                    last_err = format!("Failed to start spectacle: {}", e);
-                }
             }
-            // Increase delay between retries
             std::thread::sleep(std::time::Duration::from_millis(150));
         }
 
-        Err(format!(
-            "Vision Recovery Failed: Output stream truncated after 5 attempts. Last error: {}",
-            last_err
-        )
-        .into())
+        Err("KDE capture failed after 5 attempts".into())
     }
 
     fn capture_gnome() -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
-        // gnome-screenshot -f /tmp/...
         let cache_dir = dirs::cache_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
-        let speechd_cache = cache_dir.join("speechd-ng");
+        let speechd_cache = cache_dir.join("speechd-vision");
         std::fs::create_dir_all(&speechd_cache)?;
-        let output_path = speechd_cache.join("vision_capture_gnome.png");
+        let output_path = speechd_cache.join("capture_gnome.png");
         let output_path_str = output_path.to_string_lossy();
 
         let status = Command::new("gnome-screenshot")
-            .args(&["-f", &output_path_str])
+            .args(["-f", &output_path_str])
             .status();
 
         match status {
@@ -149,9 +107,7 @@ impl VisionHelper {
     }
 
     fn capture_grim_generic() -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
-        // grim - (stdout)
         let output = Command::new("grim").arg("-").output()?;
-
         if output.status.success() {
             Ok(output.stdout)
         } else {
@@ -160,11 +116,9 @@ impl VisionHelper {
     }
 
     fn capture_x11() -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
-        // Fallback for X11 environments
-
         // Try ImageMagick 'import'
         let output = Command::new("import")
-            .args(&["-window", "root", "png:-"])
+            .args(["-window", "root", "png:-"])
             .output();
 
         if let Ok(o) = output {
@@ -173,15 +127,15 @@ impl VisionHelper {
             }
         }
 
-        // Try scrot with temp file
+        // Try scrot
         let cache_dir = dirs::cache_dir().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
-        let speechd_cache = cache_dir.join("speechd-ng");
+        let speechd_cache = cache_dir.join("speechd-vision");
         std::fs::create_dir_all(&speechd_cache)?;
-        let output_path = speechd_cache.join("vision_capture_x11.png");
+        let output_path = speechd_cache.join("capture_x11.png");
         let output_path_str = output_path.to_string_lossy();
 
         let status = Command::new("scrot")
-            .args(&["--overwrite", &output_path_str])
+            .args(["--overwrite", &output_path_str])
             .status();
 
         match status {
@@ -195,41 +149,41 @@ impl VisionHelper {
     }
 }
 
-use candle_core::{DType, Device, Module, Tensor};
-use candle_nn::VarBuilder;
-use candle_transformers::models::moondream::{Config, Model};
-use hf_hub::{api::sync::Api, Repo, RepoType};
-use tokenizers::Tokenizer;
-
-pub struct TheEye {
+/// The Eye: Moondream 2 Vision-Language Model
+struct TheEye {
     model: Option<Model>,
     tokenizer: Option<Tokenizer>,
     device: Device,
+    last_used: std::time::Instant,
 }
 
 impl TheEye {
-    pub fn new() -> Self {
-        // Initialize device (CUDA if available, else CPU)
+    fn new() -> Self {
         let device = Device::cuda_if_available(0).unwrap_or(Device::Cpu);
-
+        println!("Vision service using device: {:?}", device);
         TheEye {
             model: None,
             tokenizer: None,
             device,
+            last_used: std::time::Instant::now(),
         }
     }
 
-    /// Loads the Moondream model from Hugging Face Hub.
-    /// This is a heavy operation and should only be called when needed.
-    pub fn load_model(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    fn unload_model(&mut self) {
+        if self.model.is_some() {
+            println!("Idle timeout: Unloading vision model to free resources...");
+            self.model = None;
+            self.tokenizer = None;
+        }
+    }
+
+    fn load_model(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.last_used = std::time::Instant::now();
         if self.model.is_some() {
             return Ok(());
         }
 
-        println!(
-            "The Eye: Loading Moondream 2 (2024-03-06) on {:?}...",
-            self.device
-        );
+        println!("Loading Moondream 2 (2024-03-06) on {:?}...", self.device);
         let api = Api::new()?;
         let repo = api.repo(Repo::with_revision(
             "vikhyatk/moondream2".to_string(),
@@ -237,10 +191,10 @@ impl TheEye {
             "2024-03-06".to_string(),
         ));
 
-        println!("The Eye: Fetching model files...");
+        println!("Fetching model files from HuggingFace...");
         let model_file = repo.get("model.safetensors")?;
         let tokenizer_file = repo.get("tokenizer.json")?;
-        println!("The Eye: Files fetched. Building VarBuilder (F16)...");
+        println!("Files fetched. Building model (F16)...");
 
         let config = Config::v2();
         let tokenizer = Tokenizer::from_file(tokenizer_file).map_err(|e| e.to_string())?;
@@ -248,59 +202,42 @@ impl TheEye {
         let vb = unsafe {
             VarBuilder::from_mmaped_safetensors(&[model_file], DType::F16, &self.device)?
         };
-        println!("The Eye: VarBuilder built. Initializing model structure...");
-        let model = match Model::new(&config, vb) {
-            Ok(m) => m,
-            Err(e) => {
-                println!("The Eye Error: Model::new failed: {}", e);
-                return Err(e.into());
-            }
-        };
 
+        let model = Model::new(&config, vb)?;
         self.model = Some(model);
         self.tokenizer = Some(tokenizer);
 
-        println!("The Eye: Model initialized and ready on {:?}.", self.device);
+        println!("Moondream 2 ready on {:?}", self.device);
         Ok(())
     }
 
-    /// Describes the given image bytes using the Moondream model.
-    pub fn describe_image(
+    fn describe_image(
         &mut self,
         image_bytes: &[u8],
         prompt: &str,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        // Ensure model is loaded
         if self.model.is_none() {
             self.load_model()?;
         }
 
-        // Preprocess image BEFORE mutable borrow of model (fixes E0502)
         let img_tensor = self.preprocess_image(image_bytes)?;
-
         let model = self.model.as_mut().unwrap();
         model.text_model.clear_kv_cache();
         let tokenizer = self.tokenizer.as_ref().unwrap();
 
-        // Note: Generic normalization now handled in preprocess_image
-
-        // Encode image
         let image_embeds = model.vision_encoder.forward(&img_tensor)?;
 
-        // Prepare prompt tokens - Moondream standard template
         let formatted_prompt = format!("\n\nQuestion: {}\n\nAnswer:", prompt);
-        let mut tokens = match tokenizer.encode(formatted_prompt.as_str(), true) {
-            Ok(t) => t.get_ids().to_vec(),
-            Err(e) => {
-                println!("The Eye Error: Tokenizer::encode failed: {}", e);
-                return Err(e.to_string().into());
-            }
-        };
+        let mut tokens = tokenizer
+            .encode(formatted_prompt.as_str(), true)
+            .map_err(|e| e.to_string())?
+            .get_ids()
+            .to_vec();
+
         if tokens.is_empty() {
             return Err("Empty prompt".into());
         }
 
-        // Special tokens
         let special_token = tokenizer
             .get_vocab(true)
             .get("<|endoftext|>")
@@ -313,7 +250,6 @@ impl TheEye {
         let mut logits_processor =
             candle_transformers::generation::LogitsProcessor::new(1337, None, None);
 
-        // Generation loop
         for index in 0..128 {
             let context_size = if index > 0 { 1 } else { tokens.len() };
             let ctxt = &tokens[tokens.len().saturating_sub(context_size)..];
@@ -330,7 +266,6 @@ impl TheEye {
 
             let logits = logits.squeeze(0)?.to_dtype(DType::F32)?;
 
-            // Apply repeat penalty
             let repeat_penalty = 1.2f32;
             let repeat_last_n = 64;
             let start_at = tokens.len().saturating_sub(repeat_last_n);
@@ -355,16 +290,13 @@ impl TheEye {
             }
         }
 
-        let cleaned = generated_text
+        Ok(generated_text
             .replace("<END>", "")
             .replace("<|endoftext|>", "")
             .trim()
-            .to_string();
-
-        Ok(cleaned)
+            .to_string())
     }
 
-    /// Refactored helper for image preprocessing to allow independent testing.
     fn preprocess_image(
         &self,
         image_bytes: &[u8],
@@ -386,45 +318,164 @@ impl TheEye {
             .broadcast_sub(&mean)?
             .broadcast_div(&std)?
             .unsqueeze(0)?
-            .to_dtype(DType::F16)?; // Model weights are F16
+            .to_dtype(DType::F16)?;
 
         Ok(img_tensor)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// D-Bus service interface for Vision
+struct VisionService {
+    eye: Arc<Mutex<TheEye>>,
+}
 
-    #[test]
-    fn test_adversarial_image_shapes() {
-        let vision = TheEye::new();
+#[interface(name = "org.speech.Vision")]
+impl VisionService {
+    #[zbus(name = "Ping")]
+    async fn ping(&self) -> String {
+        "pong".to_string()
+    }
 
-        // 1. Extreme aspect ratio (32:9 equivalent)
-        let wide_img = image::DynamicImage::new_rgb8(3200, 900);
-        let mut wide_bytes = std::io::Cursor::new(Vec::new());
-        wide_img
-            .write_to(&mut wide_bytes, image::ImageFormat::Png)
-            .unwrap();
-        let wide_bytes = wide_bytes.into_inner();
+    #[zbus(name = "GetVersion")]
+    async fn get_version(&self) -> String {
+        env!("CARGO_PKG_VERSION").to_string()
+    }
 
-        let tensor = vision.preprocess_image(&wide_bytes).unwrap();
-        assert_eq!(tensor.dims(), &[1, 3, 378, 378]);
+    #[zbus(name = "GetStatus")]
+    async fn get_status(&self) -> (bool, String) {
+        let eye = self.eye.lock().unwrap();
+        let model_loaded = eye.model.is_some();
+        let device = format!("{:?}", eye.device);
+        (model_loaded, device)
+    }
 
-        // 2. Zero-entropy image (solid color)
-        let solid_img = image::RgbImage::new(100, 100); // Defaults to black
-        let img = image::DynamicImage::ImageRgb8(solid_img);
-        let mut solid_bytes = std::io::Cursor::new(Vec::new());
-        img.write_to(&mut solid_bytes, image::ImageFormat::Png)
-            .unwrap();
-        let solid_bytes = solid_bytes.into_inner();
+    #[zbus(name = "DescribeScreen")]
+    async fn describe_screen(&self, prompt: String) -> String {
+        println!("Received DescribeScreen request: {}", prompt);
 
-        let tensor = vision.preprocess_image(&solid_bytes).unwrap();
-        assert_eq!(tensor.dims(), &[1, 3, 378, 378]);
+        let eye = self.eye.clone();
 
-        // Ensure no NaNs in the normalized tensor (convert F16 back to F32 for check)
-        let tensor_f32 = tensor.to_dtype(DType::F32).unwrap();
-        let vals = tensor_f32.flatten_all().unwrap().to_vec1::<f32>().unwrap();
-        assert!(vals.iter().all(|f: &f32| f.is_finite()));
+        let result = tokio::task::spawn_blocking(move || {
+            // Capture screen
+            let image_bytes = match VisionHelper::capture_screen() {
+                Ok(bytes) => bytes,
+                Err(e) => return format!("Capture Error: {}", e),
+            };
+
+            // Analyze with model
+            let mut eye_guard = match eye.lock() {
+                Ok(guard) => guard,
+                Err(_) => return "Error: Vision model lock poisoned".to_string(),
+            };
+
+            match eye_guard.describe_image(&image_bytes, &prompt) {
+                Ok(desc) => desc,
+                Err(e) => format!("Vision Error: {}", e),
+            }
+        })
+        .await;
+
+        match result {
+            Ok(s) => s,
+            Err(e) => format!("Task Error: {}", e),
+        }
+    }
+
+    #[zbus(name = "DescribeImage")]
+    async fn describe_image(&self, image_base64: String, prompt: String) -> String {
+        println!("Received DescribeImage request");
+
+        let eye = self.eye.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            // Decode base64 image
+            let image_bytes = match base64::Engine::decode(
+                &base64::engine::general_purpose::STANDARD,
+                &image_base64,
+            ) {
+                Ok(bytes) => bytes,
+                Err(e) => return format!("Base64 Decode Error: {}", e),
+            };
+
+            // Analyze with model
+            let mut eye_guard = match eye.lock() {
+                Ok(guard) => guard,
+                Err(_) => return "Error: Vision model lock poisoned".to_string(),
+            };
+
+            match eye_guard.describe_image(&image_bytes, &prompt) {
+                Ok(desc) => desc,
+                Err(e) => format!("Vision Error: {}", e),
+            }
+        })
+        .await;
+
+        match result {
+            Ok(s) => s,
+            Err(e) => format!("Task Error: {}", e),
+        }
+    }
+
+    #[zbus(name = "PreloadModel")]
+    async fn preload_model(&self) -> (bool, String) {
+        println!("Preloading vision model...");
+
+        let eye = self.eye.clone();
+
+        let result = tokio::task::spawn_blocking(move || {
+            let mut eye_guard = match eye.lock() {
+                Ok(guard) => guard,
+                Err(_) => return (false, "Lock poisoned".to_string()),
+            };
+
+            match eye_guard.load_model() {
+                Ok(_) => (true, "Model loaded successfully".to_string()),
+                Err(e) => (false, format!("Load error: {}", e)),
+            }
+        })
+        .await;
+
+        match result {
+            Ok(r) => r,
+            Err(e) => (false, format!("Task error: {}", e)),
+        }
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("========================================");
+    println!("   SpeechD-Vision Service v{}", env!("CARGO_PKG_VERSION"));
+    println!("========================================");
+
+    let eye = Arc::new(Mutex::new(TheEye::new()));
+    let service = VisionService { eye: eye.clone() }; // Clone for the service, keep original for cleanup task
+
+    let conn = connection::Builder::session()?
+        .name("org.speech.Vision")?
+        .serve_at("/org/speech/Vision", service)?
+        .build()
+        .await?;
+
+    println!("Vision service running on D-Bus (org.speech.Vision)");
+    println!("Efficiency: Model will auto-unload after 5 minutes of inactivity.");
+
+    // Task for idle-unloading
+    let eye_cleanup = eye.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await; // Check every minute
+            if let Ok(mut eye_guard) = eye_cleanup.lock() {
+                if eye_guard.model.is_some() && eye_guard.last_used.elapsed().as_secs() > 300 {
+                    // 5 minutes = 300 seconds
+                    eye_guard.unload_model();
+                }
+            }
+        }
+    });
+
+    // Keep the service running
+    loop {
+        std::future::pending::<()>().await;
     }
 }

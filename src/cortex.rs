@@ -1,6 +1,5 @@
 use crate::chronicler::Chronicler;
 use crate::fingerprint::Fingerprint;
-use crate::vision::{TheEye, VisionHelper};
 use lazy_static::lazy_static;
 use regex::Regex;
 use reqwest::Client;
@@ -12,6 +11,7 @@ use tokio::task;
 
 use base64::prelude::*;
 use deunicode::deunicode;
+use zbus::Connection;
 
 lazy_static! {
     static ref INJECTION_REGEX: Regex = Regex::new(
@@ -131,7 +131,6 @@ impl Cortex {
         let _fingerprint = Fingerprint::new();
 
         task::spawn(async move {
-            let mut eye = TheEye::new();
             while let Some(msg) = rx.recv().await {
                 match msg {
                     CortexMessage::Observe(text) => {
@@ -149,23 +148,46 @@ impl Cortex {
                         prompt,
                         response_tx,
                     } => {
-                        let prompt = sanitize_input(&prompt);
-                        let image_result = VisionHelper::capture_screen();
-                        match image_result {
-                            Ok(bytes) => match eye.describe_image(&bytes, &prompt) {
-                                Ok(desc) => {
-                                    let _ = response_tx.send(desc).await;
-                                }
-                                Err(e) => {
-                                    let _ = response_tx.send(format!("Vision Error: {}", e)).await;
-                                }
-                            },
-                            Err(e) => {
-                                let _ = response_tx
-                                    .send(format!("Failed to capture screen: {}", e))
-                                    .await;
+                        // Call external vision service via D-Bus
+                        let result = async {
+                            let (enabled, prompt) = {
+                                let s = crate::config_loader::SETTINGS.read().unwrap();
+                                (s.enable_vision, sanitize_input(&prompt))
+                            };
+
+                            if !enabled {
+                                return Ok(
+                                    "Vision features are disabled in configuration.".to_string()
+                                );
                             }
+
+                            let conn = Connection::session().await?;
+                            let proxy = conn
+                                .call_method(
+                                    Some("org.speech.Vision"),
+                                    "/org/speech/Vision",
+                                    Some("org.speech.Vision"),
+                                    "DescribeScreen",
+                                    &(prompt,),
+                                )
+                                .await?;
+                            let response: String = proxy.body().deserialize()?;
+                            Ok::<String, zbus::Error>(response)
                         }
+                        .await;
+
+                        let response = match result {
+                            Ok(desc) => desc,
+                            Err(e) => {
+                                let err_str = e.to_string();
+                                if err_str.contains("ServiceUnknown") {
+                                    "Vision service not running. Install and start speechd-vision for screen description features.".to_string()
+                                } else {
+                                    format!("Vision Error: {}", e)
+                                }
+                            }
+                        };
+                        let _ = response_tx.send(response).await;
                     }
                     CortexMessage::Query {
                         prompt,
@@ -203,14 +225,24 @@ impl Cortex {
                             }
                         }
 
+                        let (ollama_url, ollama_model, system_prompt) = {
+                            let settings = crate::config_loader::SETTINGS.read().unwrap();
+                            (
+                                settings.ollama_url.clone(),
+                                settings.ollama_model.clone(),
+                                settings.system_prompt.clone(),
+                            )
+                        };
+
                         let payload = json!({
-                            "model": "llama3.2:3b",
+                            "model": ollama_model,
+                            "system": system_prompt,
                             "prompt": format!("Context:\n{}\n\nUser: {}", context, prompt),
                             "stream": false
                         });
 
                         match client
-                            .post("http://localhost:11434/api/generate")
+                            .post(format!("{}/api/generate", ollama_url))
                             .json(&payload)
                             .send()
                             .await
@@ -256,15 +288,25 @@ impl Cortex {
                             }
                         }
 
+                        let (ollama_url, ollama_model, system_prompt) = {
+                            let settings = crate::config_loader::SETTINGS.read().unwrap();
+                            (
+                                settings.ollama_url.clone(),
+                                settings.ollama_model.clone(),
+                                settings.system_prompt.clone(),
+                            )
+                        };
+
                         let payload = json!({
-                            "model": "llama3.2:3b",
+                            "model": ollama_model,
+                            "system": system_prompt,
                             "prompt": format!("Context:\n{}\n\nUser: {}", context, prompt),
                             "stream": true,
                             "images": images
                         });
 
                         let res = client
-                            .post("http://localhost:11434/api/generate")
+                            .post(format!("{}/api/generate", ollama_url))
                             .json(&payload)
                             .send()
                             .await;

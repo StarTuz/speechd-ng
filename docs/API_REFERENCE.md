@@ -142,6 +142,10 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Lis
 
 **Returns:** Transcribed text.
 
+**Errors:**
+
+- Returns `ServiceUnknown` or "Permission Denied" if `enable_microphone = false` in config.
+
 ---
 
 ### `ListenVad() → String`
@@ -870,4 +874,4 @@ journalctl --user -u speechd-ng -f
 
 ---
 
-*Last Updated: 2026-01-09 (v0.7.2)*
+*Last Updated: 2026-01-10 (v1.0.0)*

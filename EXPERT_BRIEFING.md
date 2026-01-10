@@ -128,7 +128,8 @@ The expert committee has completed its initial review of the SpeechD-NG codebase
 * **Infrastructure Readiness**: **COMPLETE**. Screenshot capture (X11/Wayland), D-Bus API, and CLI integration are all verified and functional.
 * **Model Configuration Mismatch**: **Status**: **RESOLVED** via `Config::v2()` injection and `moondream1` stabilization.
 
-- **Resolution**: Bypassed unstable Hugging Face `config.json` by using `candle-transformers` internal defaults. Fixed image preprocessing (378x378 resize + ImageNet normalization).
+* **Resolution**: Bypassed unstable Hugging Face `config.json` by using `candle-transformers` internal defaults. Fixed image preprocessing (378x378 resize + ImageNet normalization).
+
 * **Verification**: `speechd-control describe` now returns accurate screen descriptions.
 
 * **Revision instability**: Pinning to older revisions (`2024-03-06`, `2024-05-20`) resolves the `phi_config` issue but introduces `vocab_size` mismatches as the Moondream team iterates on the architecture.
@@ -150,11 +151,38 @@ The expert committee has completed its initial review of the SpeechD-NG codebase
 * **CI Linker Integrity**: **FAILED**. The `rust-lld` linker in the GitHub Actions environment consistently rejects `libvosk.so` when placed in custom directories, despite environment variable overrides (`LIBRARY_PATH`, `LD_LIBRARY_PATH`).
 * **Dependency Availability**: **FAILED**. The anticipated `wget` target for `vosk-api` v0.3.45 zip returned 404, breaking the build.
 * **Resolution**: Employed the "Shotgun Strategy":
-    1.  **Artifact Source**: Switches to `pip install vosk` (Python Wheel) which is strictly version-controlled and highly available, guaranteeing a valid `libvosk.so` binary.
-    2.  **Path Redundancy**: Copies the shared object to *both* `/usr/lib` (Standard) and `/usr/local/lib` (User/Distro).
-    3.  **Config Injection**: Dynamically generates `.cargo/config.toml` to hard-code the native link flags, bypassing environment sanitization.
+    1. **Artifact Source**: Switches to `pip install vosk` (Python Wheel) which is strictly version-controlled and highly available, guaranteeing a valid `libvosk.so` binary.
+    2. **Path Redundancy**: Copies the shared object to *both* `/usr/lib` (Standard) and `/usr/local/lib` (User/Distro).
+    3. **Config Injection**: Dynamically generates `.cargo/config.toml` to hard-code the native link flags, bypassing environment sanitization.
 
 ### **Proposals**
 
-1.  **Vendor Native Deps**: Investigating checking in the `.so` files for `vosk` and `wyoming` directly into `lib/` to remove network dependency during build phases entirely.
-2.  **Containerize Build**: Move from a shell script runner to a custom Docker container image (`speechd-ng-builder`) that has `libvosk` pre-installed.
+1. **Vendor Native Deps**: Investigating checking in the `.so` files for `vosk` and `wyoming` directly into `lib/` to remove network dependency during build phases entirely.
+2. **Containerize Build**: Move from a shell script runner to a custom Docker container image (`speechd-ng-builder`) that has `libvosk` pre-installed.
+
+---
+
+## 7. Council Leadership Briefing | **Jaana Dogan**
+
+### **Subject: Architectural Retrospective & Persona Recruitment**
+
+Following the recent failure in "The Eye" (Vision) deployment, I am assuming direct leadership of the High Council. We allowed a monolithic "AI-first" mindset to override critical systems engineering principles.
+
+**Current Assessment:**
+
+* **Vision Modularity**: The shift to a separate, elective binary is a mandatory correction. We must treat all "Large Model" features as untrusted external services, never core dependencies.
+* **Observability Gap**: We are blind to the actual performance cost of these models on diverse hardware (e.g. the Arch Linux CUDA version trap). We need telemetry that doesn't rely on the "Cortex" hallucinating its own health.
+
+### **New Persona Recommendations:**
+
+By my authority as Head of the Council, I recommend the immediate recruitment of the following experts:
+
+1. **"Scale" | Distributed Systems & IPC Specialist**:
+   * **Mandate**: Refactor our D-Bus and TCP bridges (Wyoming/Ollama) to use high-performance, non-blocking protocols and service discovery.
+   * **Need**: The current "Cortex" has too much hardcoded knowledge of its backends.
+
+2. **"Lens" | Observability & eBPF Engineer**:
+   * **Mandate**: Implement deep system instrumentation to track millisecond-level latencies in the audio and vision pipelines without adding overhead.
+   * **Need**: We need data, not "bad responses," when users ask about performance.
+
+*I will begin interviewing candidates for these roles immediately.*

@@ -105,6 +105,17 @@ impl Ear {
         let mut recognizer =
             Recognizer::new(&model, 16000.0).ok_or("Failed to create recognizer")?;
 
+        // Governance Check: Microphone Permission
+        if !crate::config_loader::SETTINGS
+            .read()
+            .unwrap()
+            .enable_microphone
+        {
+            return Err(
+                "Microphone access denied by governance policy (enable_microphone = false)".into(),
+            );
+        }
+
         let host = cpal::default_host();
         let device = host.default_input_device().ok_or("No input device found")?;
         let config = device.default_input_config()?;

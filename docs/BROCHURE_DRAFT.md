@@ -4,17 +4,17 @@
 
 SpeechD-NG is a **Privacy-First, Multimodal Speech Assistant Daemon** for the Linux Desktop. It is a unified service that bridges the gap between raw AI models and your everyday workflow. It provides:
 
-- **Hearing**: High-performance local Speech-to-Text (STT).
-- **Thinking**: Context-aware local LLM reasoning (via Ollama).
-- **Seeing**: Local Computer Vision for screen analysis (The Eye).
+- **Hearing**: High-performance local Speech-to-Text (STT) [Opt-in].
+- **Thinking**: Context-aware local LLM reasoning (via Ollama) [Opt-in].
+- **Seeing**: Local Computer Vision for screen analysis (The Eye) [Optional Module].
 - **Speaking**: High-quality Neural Text-to-Speech (TTS).
 
 ## 🚀 Why install and make use of it?
 
-1. **Unparalleled Privacy**: 100% local inference. Your screen, your voice, and your data never leave your machine.
-2. **Situational Intelligence**: Unlike generic assistants, it can "see" what you are doing. Ask: *"What's the error in this terminal?"* or *"Explain this graph"*.
-3. **Self-Improving Phonetics**: Features **Passive Learning**—it remembers your unique accent and corrections, improving accuracy the more you use it.
-4. **Systems Grade Reliability**: Written in pure Rust with strict Systemd sandboxing, zero Python dependencies, and sub-millisecond D-Bus response times.
+1. **Unparalleled Privacy**: 100% local inference. Microphones and cameras are **HARD-DISABLED** by default.
+2. **Situational Intelligence**: Can "see" your screen, but only when you explicitly ask.
+3. **Passive Learning**: Adapts to your voice over time (if enabled).
+4. **Systems Grade Reliability**: Written in pure Rust with strict E2E verification (`verify_system.sh`).
 
 ## ⚔️ Is there anything like it on Linux?
 

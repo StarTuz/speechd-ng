@@ -27,7 +27,7 @@ This document outlines the strategic phases for SpeechD-NG development.
 - [x] **Cortex Module**: Async actor holding the "Short-Term Memory" (Speech History).
 - [x] **Omniscient API**: D-Bus methods for clients to query context (e.g., `QueryContext`, `SummarizeHistory`).
 - [x] **Ollama Connector**: HTTP client to talk to `localhost:11434` for processing queries.
-- [ ] **Reference Client**: A simple CLI tool (simulating a WM widget) to demonstrate "Asking the Daemon" about what was said.
+- [x] **Reference Client**: CLI tool `speechd-control` demonstrates daemon interaction (speak, listen, describe, think, train).
 
 ## Phase 4: Security & Configuration (✅ Completed)
 
@@ -60,7 +60,7 @@ This document outlines the strategic phases for SpeechD-NG development.
 
 **Goal**: Semi-Autonomous Operation.
 
-- [x] **Wake Word Detection**: Low-power standby observing for "StarTuz" via Vosk.
+- [x] **Wake Word Detection**: Low-power standby observing for "Wendy" (configurable) via Vosk.
 - [x] **Voice Commands**: Trigger actions via speech (e.g., "Summarize the last 10 minutes").
 - [x] **Command Loop**: Seamless transition from standby to active listening and back.
 

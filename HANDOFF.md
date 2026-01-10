@@ -1,4 +1,4 @@
-# Project Handoff: SpeechD-NG (v0.7.2)
+# Project Handoff: SpeechD-NG (v1.0.0)
 
 ## Current Context
 
@@ -28,12 +28,14 @@
 - **In-Memory**: Audio processing happens in RAM; no more `/tmp` disk I/O for VAD or transcription.
 - **Reliability**: Self-contained binary reduces system dependencies and installation failure points.
 
-### 👁️ The Eye (Local Vision) - **FULLY OPERATIONAL**
+### 👁️ The Eye (Local Vision) - **MODULAR SERVICE**
 
-- **Architecture**: Leverages `candle-transformers` (v0.8.0) with an optimized Moondream 1 engine.
-- **D-Bus Integration**: `DescribeScreen` method allows any authorized app to request a scene description.
-- **CLI**: `speechd-control describe` provides instant multimodal awareness.
-- **Resolution**: Successfully bypassed Hugging Face `config.json` discrepancies by using manual configuration injection (`Config::v2()`) and robust image preprocessing.
+- **Architecture**: Now a **separate binary** (`speechd-vision`) for clean separation of concerns.
+- **D-Bus Integration**: `DescribeScreen` via `org.speech.Vision` D-Bus service.
+- **CLI**: `speechd-control describe` works when vision service is running.
+- **Installation**: Optional during install - requires CUDA 11.x-12.6 for usable performance.
+- **Performance**: 1-3 seconds with CUDA, 30-60+ seconds on CPU (not recommended).
+- **Model**: Moondream 2 via `candle-transformers` with F16 precision.
 
 ## File Structure
 
@@ -42,14 +44,37 @@ src/
 ├── main.rs              # D-Bus Router & Service Entry
 ├── engine.rs            # Native Audio Engine (Mixer/TTS)
 ├── ear.rs               # Native Audio Input (STT/Wake Word/VAD)
-├── vision.rs            # Computer Vision & Screenshot Logic
 ├── wyoming.rs           # Native Wyoming Protocol Client
 ├── cortex.rs            # Async AI Cortex (Ollama Streaming)
-├── chronicler.rs        # Local Vector DB & RAG Module
+├── chronicler.rs        # Local Vector DB & RAG Module (optional ML)
 ├── fingerprint.rs       # Voice Learning Engine
 ├── config_loader.rs     # TOML Configuration
 ├── rate_limiter.rs      # Intelligent Traffic Control
-└── security.rs          # Polkit Integration Agent
+├── security.rs          # Polkit Integration Agent
+└── bin/
+    ├── speechd-control.rs   # CLI Client
+    └── speechd-vision.rs    # Separate Vision Service (optional)
+```
+
+## Modular Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    User Applications                         │
+└──────────────────────────┬───────────────────────────────────┘
+                           │ D-Bus
+┌──────────────────────────▼───────────────────────────────────┐
+│                   speechd-ng (Core Daemon)                   │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐            │
+│  │ Engine  │ │   Ear   │ │ Cortex  │ │Chronicler│            │
+│  │  (TTS)  │ │  (STT)  │ │  (LLM)  │ │  (RAG)  │            │
+│  └─────────┘ └─────────┘ └─────────┘ └─────────┘            │
+└──────────────────────────┬───────────────────────────────────┘
+                           │ D-Bus (optional)
+┌──────────────────────────▼───────────────────────────────────┐
+│               speechd-vision (Optional Service)              │
+│              Moondream 2 • Screen Capture • CUDA             │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ## D-Bus API Highlights (New)

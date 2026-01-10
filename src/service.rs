@@ -342,28 +342,34 @@ impl SpeechService {
         Ok(patterns)
     }
 
+    #[zbus(name = "ExportFingerprint")]
     async fn export_fingerprint(&self, path: String) -> zbus::fdo::Result<bool> {
         println!("Exporting fingerprint to: {}", path);
         Ok(self.fingerprint.export_to_path(&path))
     }
 
+    #[zbus(name = "ImportFingerprint")]
     async fn import_fingerprint(&self, path: String, merge: bool) -> zbus::fdo::Result<u32> {
         println!("Importing fingerprint from: {} (merge={})", path, merge);
         Ok(self.fingerprint.import_from_path(&path, merge))
     }
 
+    #[zbus(name = "GetFingerprintPath")]
     async fn get_fingerprint_path(&self) -> String {
         self.fingerprint.get_path()
     }
 
+    #[zbus(name = "GetIgnoredCommands")]
     async fn get_ignored_commands(&self) -> zbus::fdo::Result<Vec<(String, String, String)>> {
         Ok(self.fingerprint.get_ignored_commands())
     }
 
+    #[zbus(name = "ClearIgnoredCommands")]
     async fn clear_ignored_commands(&self) -> zbus::fdo::Result<u32> {
         Ok(self.fingerprint.clear_ignored_commands())
     }
 
+    #[zbus(name = "CorrectIgnoredCommand")]
     async fn correct_ignored_command(
         &self,
         heard: String,
@@ -373,6 +379,7 @@ impl SpeechService {
         Ok(self.fingerprint.correct_ignored_command(&heard, &meant))
     }
 
+    #[zbus(name = "AddIgnoredCommand")]
     async fn add_ignored_command(&self, heard: String, context: String) {
         self.fingerprint.add_ignored_command(&heard, &context)
     }
@@ -440,6 +447,7 @@ impl SpeechService {
         }
     }
 
+    #[zbus(name = "GetStatus")]
     async fn get_status(&self) -> zbus::fdo::Result<(bool, f32, String, u32, bool)> {
         let (ai, thresh, stt, rag) = {
             let s = config_loader::SETTINGS.read().unwrap();
@@ -455,6 +463,7 @@ impl SpeechService {
         Ok((ai, thresh, stt, m + p, rag))
     }
 
+    #[zbus(name = "GetWyomingInfo")]
     async fn get_wyoming_info(&self) -> zbus::fdo::Result<(String, u16, String, bool, String)> {
         let settings = crate::config_loader::SETTINGS.read().unwrap();
         Ok((
@@ -657,10 +666,8 @@ impl SpeechService {
             .unwrap_or(true);
 
         if audio_enabled {
-            if audio_enabled {
-                let voice_opt = if voice.is_empty() { None } else { Some(voice) };
-                self.engine.speak(&text, voice_opt);
-            }
+            let voice_opt = if voice.is_empty() { None } else { Some(voice) };
+            self.engine.speak(&text, voice_opt);
         }
 
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;

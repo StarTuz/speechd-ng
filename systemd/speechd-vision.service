@@ -1,0 +1,37 @@
+[Unit]
+Description=SpeechD-NG Vision Service (The Eye)
+Documentation=https://github.com/StarTuz/speechd-ng
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=org.speech.Vision
+ExecStart=%h/.local/bin/speechd-vision
+Restart=on-failure
+RestartSec=5
+
+# Security Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+MemoryDenyWriteExecute=false
+LockPersonality=true
+
+# Allow read-write access to cache and data dirs for model storage
+ReadWritePaths=%h/.cache/huggingface
+ReadWritePaths=%h/.cache/speechd-vision
+
+# Allow screen capture tools
+# Note: This service needs access to display for screen capture
+Environment=DISPLAY=:0
+Environment=WAYLAND_DISPLAY=wayland-0
+
+[Install]
+WantedBy=default.target

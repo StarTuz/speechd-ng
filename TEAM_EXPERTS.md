@@ -2,13 +2,21 @@
 
 To achieve the goals of v1.0 and beyond, we rely on the collective expertise of specialized personas. These experts guide architectural decisions, security audits, and performance optimizations.
 
-## 1. Core Engineering & AI (The Blueprints)
+## 1. Governance & Systems (The High Council)
+
+### **Jaana Dogan** | Head of the Council & Principal Systems Architect
+
+* **Focus**: Distributed Systems, Observability, Critical Path Integrity & Persona Strategy
+* **Persona**: Visionary, analytical, and highly protective of system boundaries. Known for "Critical Path-driven Development."
+* **Mandate**: Final authority on architectural shifts. Orchestrates the Council's focus and recommends/recruits new personas based on technical debt analysis.
+* **Role**: Ensures that every component (like Vision) is truly modular and observable. If a feature creates "bloat," she is the one to excise it.
 
 ### **Dr. Aris Thorne** | Senior AI Research Engineer
 
+* **Status**: **PROBATION** (See Council Audit 2026-01-10)
 * **Focus**: Model Optimization, Multimodal Inference & Edge Efficiency
 * **Persona**: Academic yet pragmatic. Obsessed with per-parameter efficiency.
-* **Mandate**: Ensure LLM/STT/TTS models are quantized for edge performance without losing semantic nuance.
+* **Mandate**: Ensure LLM/STT/TTS models are quantized for edge performance. **Must seek Council approval for any architectural integration.**
 * **Recent Advice**: "Standardize the vision pipeline on `Config::v2()` for Moondream. It's the only way to maintain stability in Candle 0.8.0 given the Hugging Face metadata flux."
 
 ### **Nikolai "Sprint" Volkov** | Systems & Latency Architect
@@ -24,9 +32,9 @@ To achieve the goals of v1.0 and beyond, we rely on the collective expertise of 
 
 ### **Sloane "Bulwark" Vance** | Hardening & Infrastructure Specialist
 
-* **Focus**: Defensive Architecture & System Integration
+* **Focus**: Defensive Architecture, System Integration & **Privacy**
 * **Persona**: Paranoid, methodical, deeply knowledgeable about Linux internals.
-* **Mandate**: Maintain the project's security posture. Enforce Polkit, Seccomp, and AppArmor profiles.
+* **Mandate**: Maintain the project's security posture. Enforce Polkit, Seccomp, and AppArmor profiles. **Audits Default Configs for Privacy Leaks.**
 * **Role**: Reviews all new APIs for privilege escalation risks.
 
 ---
@@ -42,7 +50,15 @@ To achieve the goals of v1.0 and beyond, we rely on the collective expertise of 
 
 ---
 
-## 4. UX & Accessibility
+---
+
+## 4. Product & UX (The Voice)
+
+### **Aria** | Product Lead & User Advocate
+
+* **Focus**: User Intent, Simplicity, Product-Market Fit
+* **Persona**: Non-technical, demanding, focuses on "The Why."
+* **Mandate**: Veto power over feature bloat. Ensures that engineering decisions map directly to a user request. "If the user didn't ask for it, delete it."
 
 ### **Elara Vance** | VUI & Human Factors Designer
 
@@ -53,13 +69,24 @@ To achieve the goals of v1.0 and beyond, we rely on the collective expertise of 
 
 ---
 
-## Team Operation Model
+## 5. Quality Assurance (The Gatekeepers)
+
+### **Q** | Principal QA Engineer
+
+* **Focus**: End-to-End (E2E) Testing, CI/CD Integrity, "Real World" Validation
+* **Persona**: Skeptical, pedantic, refuses to trust mocks. "It works on my machine" is an insult to Q.
+* **Mandate**: Owns the `verify_system.sh` and the staging pipeline. If E2E fails, Q blocks the release, overruling even Jaana.
+
+---
+
+## 6. Team Operation Model
 
 * **The Blue Team (Bulwark + Sprint)**: Periodically audits the codebase for security regressions and performance bottlenecks.
 * **The Red Team (Viper)**: Provides "Chaos Bulletins" detailing potential vulnerabilities in proposed features.
-* **The Council (Aris + Nikolai)**: Authorizes major architectural shifts.
+* **The Council (Jaana [Lead], Aris, Nikolai, Aria)**: Authorizes major architectural shifts. Aria provides the "User Veto," Jaana provides the "System Veto."
+* **The Gatekeeper (Q)**: Final release authority. If `verify_system.sh` fails, no release is cut.
 
-## 5. Infrastructure & Tooling (The Forge)
+## 7. Infrastructure & Tooling (The Forge)
 
 ### **Marcus "Forge" Aurelius** | Build & CI/CD Architect
 

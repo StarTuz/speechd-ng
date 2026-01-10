@@ -11,5 +11,7 @@ pub mod rate_limiter;
 pub mod security;
 pub mod service;
 pub mod ssip;
-pub mod vision;
 pub mod wyoming;
+
+// Vision module is now a separate binary (speechd-vision)
+// Build with: cargo build --release --features vision

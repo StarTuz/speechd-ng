@@ -8,12 +8,13 @@
 
 1. **Window Manager Agnostic**: Works flawlessly on GNOME, KDE, Sway, Hyprland, and raw TTYs.
 2. **Service-Based**: Runs as a standard `systemd` user service.
-3. **Secure by Design**: Uses D-Bus for IPC with strict isolation and Polkit authorization.
-4. **AI-Ready**: Built to integrate with local LLMs (like Ollama) for contextual understanding.
-5. **Neural First**: First-class support for high-quality Piper neural voices.
-6. **Pure Rust Autonomous Mode**: Integrated native wake word detection (Wendy) for hands-free interaction.
-7. **Self-Improving**: Passive and manual voice learning to correct transcription errors over time.
-8. **Multimodal**: Can see and describe the screen via local computer vision (The Eye).
+3. **Privacy-First**: Microphone, Camera, and AI are **DISABLED** by default. You must explicitly opt-in.
+4. **Secure by Design**: Uses D-Bus for IPC with strict isolation and Polkit authorization.
+5. **AI-Ready**: Built to integrate with local LLMs (like Ollama) for contextual understanding.
+6. **Neural First**: First-class support for high-quality Piper neural voices.
+7. **Pure Rust Autonomous Mode**: Integrated native wake word detection (Wendy) for hands-free interaction.
+8. **Self-Improving**: Passive and manual voice learning to correct transcription errors over time.
+9. **Modular Vision**: The "Eye" is a separate, side-car service that can be installed or ignored.
 
 ## 🏗 Architecture
 
@@ -22,7 +23,7 @@
 | **The Daemon** | Rust + `zbus`. Lightweight D-Bus router. |
 | **Audio Engine** | Multi-backend mixer (eSpeak-ng + Piper). |
 | **The Ear** | Native audio capture with offline STT (Vosk/Whisper). Zero Python. |
-| **The Eye** | Local Vision Model (Moondream 2) for screen analysis. |
+| **The Eye** | **OPTIONAL** Local Vision Model (Moondream 2). Side-car service. |
 | **The Cortex** | Async Ollama connector with token-based streaming. |
 | **The Chronicler** | Local vector database and embedding engine for long-term memory. |
 | **The Fingerprint** | Voice learning engine for STT error correction. |
@@ -66,6 +67,9 @@ mkdir -p ~/.local/share/speechd-ng
 mkdir -p ~/Documents
 
 systemctl --user enable --now speechd-ng
+
+# Verify Installation (Critical)
+./scripts/verify_system.sh
 ```
 
 ### Configuration
@@ -89,8 +93,10 @@ wyoming_host = "127.0.0.1"
 wyoming_port = 10301
 
 # Wake Word (Hands-Free Mode)
-wake_word = "wendy"                 # Phonetically distinct generic default
-enable_wake_word = false
+# Wake Word (Hands-Free Mode)
+wake_word = "wendy"
+enable_wake_word = false            # Default: OFF (Privacy First)
+enable_microphone = false           # Default: OFF (Hardware Kill Switch)
 
 # Memory & OOM Protection
 max_audio_size_mb = 50              # Protection against malicious Large-Payload ASR
@@ -209,6 +215,12 @@ speechd-control describe "What is the error message in the terminal?"
 busctl --user call org.speech.Service /org/speech/Service org.speech.Service DescribeScreen s "Describe this screen"
 ```
 
+**Pre-requisites:**
+
+1. `speechd-vision` binary must be installed.
+2. `enable_vision = true` in `Speech.toml`.
+3. Systemd service `speechd-vision` must be active.
+
 ## 🎤 Piper TTS Setup
 
 ### Binary Conflict Warning
@@ -225,8 +237,10 @@ piper_binary = "piper-tts"  # Or full path: /usr/bin/piper-tts
 
 SpeechD-NG is guided by **The Council**, a committee of domain expert personas:
 
-- **AI & Models**: Dr. Aris Thorne (Inference efficiency & quantization)
-- **Systems & Latency**: Nikolai "Sprint" Volkov (Low-level performance & async Rust)
+- **Product & UX**: Aria (User Advocate & Scope Police)
+- **AI & Models**: Dr. Aris Thorne (Inference efficiency) [PROBATION]
+- **Systems & Latency**: Nikolai "Sprint" Volkov (Low-level performance)
+- **Quality Assurance**: Q (The Gatekeeper - E2E Integrity)
 - **Blue Team (Defense)**: Sloane "Bulwark" Vance (Hardening & security integration)
 - **Red Team (Offense)**: Kaelen "Viper" Cross (Adversarial testing & edge cases)
 - **UX & Accessibility**: Elara Vance (Human factors & VUI design)

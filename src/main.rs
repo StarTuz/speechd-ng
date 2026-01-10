@@ -123,16 +123,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
     });
 
     // Start Autonomous Mode (Wake Word + Command Processing)
+    // Start Autonomous Mode (Wake Word + Command Processing)
     let config = config_loader::SETTINGS.read().unwrap();
     if config.enable_wake_word {
-        let ear_handler = ear.clone();
-        let engine_handler = engine.clone();
-        let cortex_handler = cortex.clone();
-        tokio::task::spawn_blocking(move || {
-            if let Ok(ear_guard) = ear_handler.lock() {
-                ear_guard.start_autonomous_mode(engine_handler, cortex_handler);
-            }
-        });
+        if config.enable_microphone {
+            let ear_handler = ear.clone();
+            let engine_handler = engine.clone();
+            let cortex_handler = cortex.clone();
+            tokio::task::spawn_blocking(move || {
+                if let Ok(ear_guard) = ear_handler.lock() {
+                    ear_guard.start_autonomous_mode(engine_handler, cortex_handler);
+                }
+            });
+        } else {
+            println!("Governance: Wake word enabled, but microphone disabled. Listening service NOT started.");
+        }
     }
 
     pending::<()>().await;

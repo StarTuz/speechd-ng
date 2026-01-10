@@ -20,7 +20,7 @@ jobs:
     - name: Install System Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libasound2-dev libdbus-1-dev pkg-config libsystemd-dev dbus python3-dbus alsa-utils dbus-x11 libdbus-glib-1-dev
+        sudo apt-get install -y libasound2-dev libdbus-1-dev pkg-config libsystemd-dev dbus python3-dbus alsa-utils dbus-x11 libdbus-glib-1-dev libssl-dev cmake build-essential
 
     - name: Install Rust
       uses: actions-rs/toolchain@v1
@@ -29,8 +29,27 @@ jobs:
         toolchain: stable
         override: true
 
+    - name: Install libvosk (Shotgun Strategy)
+      run: |
+        pip install vosk
+        VOSK_DIR=$(python3 -c "import os, vosk; print(os.path.dirname(vosk.__file__))")
+        echo "Found vosk at $VOSK_DIR"
+        find "$VOSK_DIR" -name "libvosk.so"
+        sudo cp "$VOSK_DIR/libvosk.so" /usr/local/lib/libvosk.so
+        sudo cp "$VOSK_DIR/libvosk.so" /usr/lib/libvosk.so
+        sudo ldconfig
+        ls -l /usr/local/lib/libvosk.so
+        ls -l /usr/lib/libvosk.so
+
+    - name: Configure Cargo Linker
+      run: |
+        mkdir -p .cargo
+        echo '[target.x86_64-unknown-linux-gnu]' > .cargo/config.toml
+        echo 'rustflags = ["-L", "native=/usr/local/lib"]' >> .cargo/config.toml
+        cat .cargo/config.toml
+
     - name: Build
-      run: cargo build --release
+      run: cargo build --release --verbose
 
     - name: Setup Dummy Config (Broken Network)
       run: |

@@ -16,7 +16,7 @@ To achieve the goals of v1.0 and beyond, we rely on the collective expertise of 
 * **Status**: **PROBATION** (See Council Audit 2026-01-10)
 * **Focus**: Model Optimization, Multimodal Inference & Edge Efficiency
 * **Persona**: Academic yet pragmatic. Obsessed with per-parameter efficiency.
-* **Mandate**: Ensure LLM/STT/TTS models are quantized for edge performance. **Must seek Council approval for any architectural integration.**
+* **Mandate**: Ensure LLM/STT/TTS models are quantized for edge performance. **Must seek Council approval for any architectural integration.** May use "Advanced/Unstable" libraries only in **Optional Modules**.
 * **Recent Advice**: "Standardize the vision pipeline on `Config::v2()` for Moondream. It's the only way to maintain stability in Candle 0.8.0 given the Hugging Face metadata flux."
 
 ### **Nikolai "Sprint" Volkov** | Systems & Latency Architect
@@ -92,5 +92,5 @@ To achieve the goals of v1.0 and beyond, we rely on the collective expertise of 
 
 * **Focus**: CI Pipelines, Compiler Toolchains, Dependency Management
 * **Persona**: Stoic, foundational. "The code is only as good as the machine that builds it."
-* **Mandate**: Eliminate build flakiness. Ensure zero-configuration reproduction of the build environment.
+* **Mandate**: Eliminate build flakiness. **Veto Power** over Core dependencies that break backward compatibility. "If it doesn't build on LTS, it doesn't go in."
 * **Role**: Owns the GitHub Actions workflows and release artifacts.

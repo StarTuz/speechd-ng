@@ -44,3 +44,21 @@
 ### Audit Logging
 
 - **Decision Tracking:** Log all commands with source, confidence, and action status.
+
+---
+
+## 3. Stability Doctrine (The Shiny Object Rules)
+
+### 3.1 Core vs. Optional
+
+- **Core Daemon**: Must remain compatible with LTS distributions (Debian Stable / Ubuntu LTS). "Boring is Good."
+- **Optional Modules**: May use bleeding-edge deps (e.g. CUDA 12.6) ONLY IF they live in a separate binary (like `speechd-vision`) or feature flag.
+
+### 3.2 Dependency Veto
+
+- **Zero-Recall Rule**: If a dependency update requires users to manually install new system drivers (e.g. newer glibc/CUDA), it is **REJECTED** for the Core Daemon.
+- **The "Marcus" Check**: Any PR bumping a `Cargo.lock` version must answer: "Does this break the build on the 3-year-old laptop?"
+
+### 3.3 The One-Way Ratchet
+
+- We do not regress. Once a privacy feature (like Mic Kill-Switch) is added, it cannot be "refactored out" for convenience.

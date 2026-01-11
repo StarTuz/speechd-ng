@@ -4022,7 +4022,7 @@ dependencies = [
 
 [[package]]
 name = "speechd-ng"
-version = "1.0.0"
+version = "1.0.2"
 dependencies = [
  "async-trait",
  "base64 0.22.1",

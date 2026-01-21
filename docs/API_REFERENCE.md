@@ -874,4 +874,4 @@ journalctl --user -u speechd-ng -f
 
 ---
 
-*Last Updated: 2026-01-21 (v1.0.2)*
+*Last Updated: 2026-01-21 (v1.1.0)*

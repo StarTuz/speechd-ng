@@ -1,4 +1,4 @@
-# Project Handoff: SpeechD-NG (v1.0.0)
+# Project Handoff: SpeechD-NG (v1.1.0)
 
 ## Current Context
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# SpeechD-NG Installer v1.0.0
+# SpeechD-NG Installer v1.1.0
 # Core daemon + optional Vision service
 
 CONFIG_DIR="$HOME/.config/speechd-ng"

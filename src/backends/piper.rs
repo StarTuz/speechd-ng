@@ -42,6 +42,7 @@ impl PiperBackend {
             id: voice_id.to_string(),
             name: voice_id.replace("_", " "),
             language: "unknown".to_string(),
+            gender: "unknown".to_string(),
         };
 
         if let Ok(content) = std::fs::read_to_string(config_path) {
@@ -88,6 +89,7 @@ impl SpeechBackend for PiperBackend {
                                     id: file_stem.to_string(),
                                     name: file_stem.replace("_", " "),
                                     language: "unknown".to_string(),
+                                    gender: "unknown".to_string(),
                                 });
                             }
                         }
@@ -133,6 +135,7 @@ impl SpeechBackend for PiperBackend {
                     id: key.clone(),
                     name: format!("{} ({})", name, quality),
                     language: lang.to_string(),
+                    gender: "unknown".to_string(),
                 });
             }
         }

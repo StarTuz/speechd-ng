@@ -1,35 +1,45 @@
-pub mod espeak;
-pub mod piper;
-pub mod whisper;
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc::Receiver;
 
-/// Represents a text-to-speech voice
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+// --- AI / Brain Backends (Phase 20) ---
+
+#[async_trait]
+pub trait BrainBackend: Send + Sync {
+    async fn prompt(&self, system: &str, context: &str, user: &str) -> Result<String, String>;
+    async fn stream(
+        &self,
+        system: &str,
+        context: &str,
+        user: &str,
+        images: Option<Vec<String>>,
+    ) -> Receiver<String>;
+}
+
+pub mod ollama;
+pub mod openai;
+
+// --- Audio / TTS Backends ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Voice {
     pub id: String,
     pub name: String,
     pub language: String,
+    pub gender: String,
 }
 
-/// Trait that all speech synthesis backends must implement.
-/// This allows us to plug in different engines (eSpeak, Piper, Coqui, etc.)
 pub trait SpeechBackend: Send + Sync {
-    /// Returns the data (stdout) of the synthesis process or an error
-    /// 'voice' is an optional specific voice ID to use
     fn synthesize(&self, text: &str, voice: Option<&str>) -> std::io::Result<Vec<u8>>;
-
-    /// Returns a list of supported voices installed locally
     fn list_voices(&self) -> std::io::Result<Vec<Voice>>;
-
-    /// Returns a list of voices available for download (optional)
     fn list_downloadable_voices(&self) -> std::io::Result<Vec<Voice>> {
         Ok(Vec::new())
     }
-
-    /// Downloads a voice given its ID (optional)
     fn download_voice(&self, _voice_id: &str) -> std::io::Result<()> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "Downloading not supported for this backend",
-        ))
+        Ok(())
     }
 }
+
+pub mod espeak;
+pub mod piper;
+pub mod whisper;

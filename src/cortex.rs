@@ -1,9 +1,9 @@
+use crate::backends::{ollama::OllamaBackend, openai::OpenAIBackend, BrainBackend};
 use crate::chronicler::Chronicler;
 use crate::fingerprint::Fingerprint;
 use lazy_static::lazy_static;
 use regex::Regex;
 use reqwest::Client;
-use serde_json::json;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::{channel, Sender};
@@ -21,19 +21,13 @@ lazy_static! {
 }
 
 fn sanitize_input(input: &str) -> String {
-    // 1. Remove obvious code blocks
     let mut sanitized = input.replace("```", "");
-
-    // 2. Normalize homoglyphs using deunicode
     let normalized = deunicode(&sanitized);
-
-    // 3. Filter against injection patterns on normalized text
     if INJECTION_REGEX.is_match(&normalized) {
         sanitized = INJECTION_REGEX
             .replace_all(&sanitized, "[FILTERED]")
             .to_string();
     }
-
     sanitized
 }
 
@@ -50,13 +44,13 @@ pub struct Cortex {
 }
 
 enum CortexMessage {
-    Observe(String), // Passive: Just listen and remember
+    Observe(String),
     Query {
         prompt: String,
         _asr_heard: Option<String>,
         _images: Option<Vec<String>>,
         response_tx: Sender<String>,
-    }, // Active: Ask a question about context
+    },
     QueryStream {
         prompt: String,
         _asr_heard: Option<String>,
@@ -102,7 +96,7 @@ impl Memory {
 impl Cortex {
     pub fn new_dummy() -> Self {
         let (tx, mut rx) = channel::<CortexMessage>(100);
-        tokio::spawn(async move { while let Some(_) = rx.recv().await {} });
+        tokio::spawn(async move { while rx.recv().await.is_some() {} });
         Self { tx }
     }
 
@@ -128,7 +122,21 @@ impl Cortex {
             .build()
             .unwrap_or_else(|_| Client::new());
 
-        let _fingerprint = Fingerprint::new();
+        let backend: Arc<dyn BrainBackend + Send + Sync> = {
+            let s = crate::config_loader::SETTINGS.read().unwrap();
+            match s.ai_backend.as_str() {
+                "bitnet" => Arc::new(OpenAIBackend::new(
+                    s.bitnet_url.clone(),
+                    s.bitnet_model.clone(),
+                    client.clone(),
+                )),
+                _ => Arc::new(OllamaBackend::new(
+                    s.ollama_url.clone(),
+                    s.ollama_model.clone(),
+                    client.clone(),
+                )),
+            }
+        };
 
         task::spawn(async move {
             while let Some(msg) = rx.recv().await {
@@ -139,7 +147,6 @@ impl Cortex {
                         if let Ok(mut mem) = memory.lock() {
                             mem.add(text.clone());
                         }
-                        // Add to long-term memory (RAG)
                         if let Err(e) = chron.add_memory(&text) {
                             eprintln!("Cortex: Failed to add memory: {}", e);
                         }
@@ -148,7 +155,6 @@ impl Cortex {
                         prompt,
                         response_tx,
                     } => {
-                        // Call external vision service via D-Bus
                         let result = async {
                             let (enabled, prompt) = {
                                 let s = crate::config_loader::SETTINGS.read().unwrap();
@@ -196,7 +202,6 @@ impl Cortex {
                         response_tx,
                     } => {
                         let prompt = sanitize_input(&prompt);
-                        // Check if AI is enabled
                         let ai_enabled = crate::config_loader::SETTINGS
                             .read()
                             .map(|s| s.enable_ai)
@@ -207,15 +212,12 @@ impl Cortex {
                             continue;
                         }
 
-                        println!("Cortex thinking on: {}", prompt);
-
                         let mut context = if let Ok(mem) = memory.lock() {
                             mem.get_context()
                         } else {
                             String::new()
                         };
 
-                        // Retrieve from long-term memory (RAG)
                         if let Ok(past_memories) = chron.search(&prompt, 3) {
                             if !past_memories.is_empty() {
                                 context.push_str("\n--- LONG-TERM MEMORIES ---\n");
@@ -225,43 +227,18 @@ impl Cortex {
                             }
                         }
 
-                        let (ollama_url, ollama_model, system_prompt) = {
-                            let settings = crate::config_loader::SETTINGS.read().unwrap();
-                            (
-                                settings.ollama_url.clone(),
-                                settings.ollama_model.clone(),
-                                settings.system_prompt.clone(),
-                            )
-                        };
+                        let system_prompt = crate::config_loader::SETTINGS
+                            .read()
+                            .unwrap()
+                            .system_prompt
+                            .clone();
 
-                        let payload = json!({
-                            "model": ollama_model,
-                            "system": system_prompt,
-                            "prompt": format!("Context:\n{}\n\nUser: {}", context, prompt),
-                            "stream": false
-                        });
-
-                        match client
-                            .post(format!("{}/api/generate", ollama_url))
-                            .json(&payload)
-                            .send()
-                            .await
-                        {
-                            Ok(res) => {
-                                if let Ok(json) = res.json::<serde_json::Value>().await {
-                                    let response = json["response"]
-                                        .as_str()
-                                        .unwrap_or("No response from AI.")
-                                        .to_string();
-                                    let _ = response_tx.send(response).await;
-                                } else {
-                                    let _ = response_tx
-                                        .send("Failed to parse AI response.".into())
-                                        .await;
-                                }
+                        match backend.prompt(&system_prompt, &context, &prompt).await {
+                            Ok(response) => {
+                                let _ = response_tx.send(response).await;
                             }
                             Err(e) => {
-                                let _ = response_tx.send(format!("AI Error: {}", e)).await;
+                                let _ = response_tx.send(format!("Backend Error: {}", e)).await;
                             }
                         }
                     }
@@ -271,14 +248,12 @@ impl Cortex {
                         images,
                         token_tx,
                     } => {
-                        // Implementation for streaming...
                         let mut context = if let Ok(mem) = memory.lock() {
                             mem.get_context()
                         } else {
                             String::new()
                         };
 
-                        // Retrieve from long-term memory (RAG)
                         if let Ok(past_memories) = chron.search(&prompt, 3) {
                             if !past_memories.is_empty() {
                                 context.push_str("\n--- LONG-TERM MEMORIES ---\n");
@@ -288,48 +263,17 @@ impl Cortex {
                             }
                         }
 
-                        let (ollama_url, ollama_model, system_prompt) = {
-                            let settings = crate::config_loader::SETTINGS.read().unwrap();
-                            (
-                                settings.ollama_url.clone(),
-                                settings.ollama_model.clone(),
-                                settings.system_prompt.clone(),
-                            )
-                        };
+                        let system_prompt = crate::config_loader::SETTINGS
+                            .read()
+                            .unwrap()
+                            .system_prompt
+                            .clone();
 
-                        let payload = json!({
-                            "model": ollama_model,
-                            "system": system_prompt,
-                            "prompt": format!("Context:\n{}\n\nUser: {}", context, prompt),
-                            "stream": true,
-                            "images": images
-                        });
-
-                        let res = client
-                            .post(format!("{}/api/generate", ollama_url))
-                            .json(&payload)
-                            .send()
+                        let mut stream_rx = backend
+                            .stream(&system_prompt, &context, &prompt, images)
                             .await;
-
-                        match res {
-                            Ok(response) => {
-                                let mut stream = response.bytes_stream();
-                                use futures_util::StreamExt;
-                                while let Some(item) = stream.next().await {
-                                    if let Ok(chunk) = item {
-                                        if let Ok(json) =
-                                            serde_json::from_slice::<serde_json::Value>(&chunk)
-                                        {
-                                            if let Some(token) = json["response"].as_str() {
-                                                let _ = token_tx.send(token.to_string()).await;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                let _ = token_tx.send(format!("Stream Error: {}", e)).await;
-                            }
+                        while let Some(token) = stream_rx.recv().await {
+                            let _ = token_tx.send(token).await;
                         }
                     }
                 }
@@ -362,7 +306,6 @@ impl Cortex {
 
     pub async fn query_with_vision(&self, prompt: String, image_bytes: Option<Vec<u8>>) -> String {
         let (resp_tx, mut resp_rx) = channel::<String>(1);
-
         let images = image_bytes.map(|bytes| vec![BASE64_STANDARD.encode(&bytes)]);
 
         let _ = self

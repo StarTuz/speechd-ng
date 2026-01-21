@@ -42,13 +42,14 @@ impl SpeechBackend for EspeakBackend {
                     // ID = parts[4] (the file name to pass to -v)
                     // Name = parts[3] ??
 
-                    if let (Some(lang), Some(name), Some(id)) =
-                        (parts.get(1), parts.get(3), parts.get(4))
+                    if let (Some(lang), Some(gender), Some(name), Some(id)) =
+                        (parts.get(1), parts.get(2), parts.get(3), parts.get(4))
                     {
                         voices.push(Voice {
                             id: id.to_string(),
                             name: name.to_string(),
                             language: lang.to_string(),
+                            gender: gender.to_string(),
                         });
                     }
                 }

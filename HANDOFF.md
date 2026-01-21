@@ -11,9 +11,9 @@
 | **Wake Word** | ✅ | Native `vosk-rs` (Standard: "Wendy") |
 | **STT (Vosk)** | ✅ | Native `vosk-rs` library integration |
 | **Wyoming STT**| ✅ | Native Rust TCP protocol client (`src/wyoming.rs`) |
-| **AI Stream** | ✅ | Token-based async streaming (Zero Latency) |
+| **AI Stream** | ✅ | Modular `BrainBackend` trait (Ollama + BitNet/OpenAI) |
 | **Memory (RAG)**| ✅ | Local vector RAG (`src/chronicler.rs`) |
-| **Hardening** | ✅ | Atomic OOM protection & Rate Limiting cleanups |
+| **Hardening** | ✅ | Polkit Security, Atomic OOM protection & Rate Limiting |
 
 ## Critical Features
 
@@ -45,7 +45,14 @@ src/
 ├── engine.rs            # Native Audio Engine (Mixer/TTS)
 ├── ear.rs               # Native Audio Input (STT/Wake Word/VAD)
 ├── wyoming.rs           # Native Wyoming Protocol Client
-├── cortex.rs            # Async AI Cortex (Ollama Streaming)
+├── cortex.rs            # Async AI Cortex (Multi-Backend Dispatcher)
+├── backends/            # Backend Modules
+│   ├── mod.rs           # BrainBackend & SpeechBackend Traits
+│   ├── ollama.rs        # Native Ollama AI Backend
+│   ├── openai.rs        # OpenAI-Compatible Backend (BitNet, etc.)
+│   ├── espeak.rs        # eSpeak-ng Audio Backend
+│   ├── piper.rs         # Piper TTS Audio Backend
+│   └── whisper.rs       # Whisper STT Backend
 ├── chronicler.rs        # Local Vector DB & RAG Module (optional ML)
 ├── fingerprint.rs       # Voice Learning Engine
 ├── config_loader.rs     # TOML Configuration
@@ -93,6 +100,9 @@ wake_word = "wendy"
 max_audio_size_mb = 50
 enable_ai = true
 ollama_model = "llama3"
+ai_backend = "ollama"  # or "bitnet"
+bitnet_url = "http://localhost:8000"
+bitnet_model = "models/bitnet_b1_58-3B"
 stt_backend = "vosk"  # High speed, pure rust
 enable_rag = true     # High-security local memory
 rag_top_k = 3

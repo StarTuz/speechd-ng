@@ -235,10 +235,20 @@ if [ "$SKIP_CONFIG" != "true" ]; then
     esac
 
     echo ""
-    read -p "Enable Ollama AI integration? [y/N]: " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo "--- AI Brain Selection ---"
+    echo "1) Ollama (Native REST - Default)"
+    echo "2) BitNet / OpenAI Proxy (OpenAI-compatible)"
+    read -p "Select AI Backend [1-2]: " ai_choice
+    if [ "$ai_choice" == "2" ]; then
+        AI_BACKEND="bitnet"
         ENABLE_AI="true"
+    else
+        AI_BACKEND="ollama"
+        read -p "Enable Ollama AI integration? [y/N]: " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            ENABLE_AI="true"
+        fi
     fi
 
     echo ""
@@ -256,8 +266,11 @@ if [ "$SKIP_CONFIG" != "true" ]; then
 # Generated on $(date)
 
 # AI & Context
+ai_backend = "$AI_BACKEND"
 ollama_url = "http://localhost:11434"
 ollama_model = "llama3"
+bitnet_url = "http://localhost:8000"
+bitnet_model = "models/bitnet_b1_58-3B"
 enable_ai = $ENABLE_AI
 passive_confidence_threshold = 0.1
 memory_size = 50

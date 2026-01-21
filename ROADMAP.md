@@ -200,4 +200,27 @@ This document outlines the strategic phases for SpeechD-NG development.
 - [x] **Port Handling**: Retry logic for SSIP port binding.
 - [x] **Error Returns**: Standardized `zbus::fdo::Result` usage.
 
+## Phase 20: BitNet Integration (✅ Completed)
+
+**Goal**: Support ternary 1.58-bit models via backend abstraction.
+
+- [x] Implement `BrainBackend` trait and `backends/` module.
+- [x] Add `OpenAIBackend` for BitNet/OpenAI compatibility.
+- [x] Refactor `Cortex` for modular AI dispatching.
+
+## Phase 21: One-Click Test Suite (✅ Completed)
+
+**Goal**: Automated validation of AI backends.
+
+- [x] Integrate `mockito` for API simulation.
+- [x] Create `tests/ai_integration.rs` with 100% trait coverage.
+
+## Phase 22: Comparative Benchmarking (✅ Completed)
+
+**Goal**: Quantify BitNet advantages.
+
+- [x] **Ollama Native**: Latency: 3.27s (Long-form), RAM: 71MB.
+- [x] **BitNet (OpenAI Proxy)**: Latency: 2.37s (Long-form), RAM: 72MB.
+- [x] **Verdict**: BitNet (via OpenAI proxy) provides a ~27% latency improvement for complex queries.
+
 ## Future / Backlog

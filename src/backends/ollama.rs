@@ -34,6 +34,9 @@ impl BrainBackend for OllamaBackend {
             .await
         {
             Ok(res) => {
+                if !res.status().is_success() {
+                    return Err(format!("AI Error: HTTP {}", res.status()));
+                }
                 if let Ok(json) = res.json::<serde_json::Value>().await {
                     Ok(json["response"]
                         .as_str()
@@ -70,13 +73,28 @@ impl BrainBackend for OllamaBackend {
 
             match res {
                 Ok(response) => {
+                    if !response.status().is_success() {
+                        let _ = token_tx
+                            .send(format!("Stream Error: HTTP {}", response.status()))
+                            .await;
+                        return;
+                    }
                     let mut stream = response.bytes_stream();
                     use futures_util::StreamExt;
                     while let Some(item) = stream.next().await {
                         if let Ok(chunk) = item {
-                            if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&chunk) {
-                                if let Some(token) = json["response"].as_str() {
-                                    let _ = token_tx.send(token.to_string()).await;
+                            let text = String::from_utf8_lossy(&chunk);
+                            // Ollama sends a JSON object per line.
+                            for line in text.split('\n') {
+                                let trimmed = line.trim();
+                                if trimmed.is_empty() {
+                                    continue;
+                                }
+                                if let Ok(json) = serde_json::from_str::<serde_json::Value>(trimmed)
+                                {
+                                    if let Some(token) = json["response"].as_str() {
+                                        let _ = token_tx.send(token.to_string()).await;
+                                    }
                                 }
                             }
                         }

@@ -759,13 +759,13 @@ fn main() -> zbus::Result<()> {
 
 ---
 
-## Local AI (Ollama) Management
+## Local AI Management
 
-These methods allow clients to monitor and control the local reasoning engine (Ollama).
+These methods allow clients to monitor and control the local reasoning engine (Ollama, BitNet, etc.).
 
 ### `GetBrainStatus() → (is_running: Bool, current_model: String, available_models: Array[String])`
 
-Polls the Ollama API to verify health and list downloaded models.
+Polls the active AI backend API (Ollama or BitNet/OpenAI) to verify health and list downloaded models.
 
 ```bash
 busctl --user call org.speech.Service /org/speech/Service org.speech.Service GetBrainStatus
@@ -773,15 +773,15 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Get
 
 **Returns:**
 
-- `is_running`: `true` if Ollama API is reachable.
-- `current_model`: The model currently configured in `Speech.toml`.
-- `available_models`: List of models already downloaded and ready to use.
+- `is_running`: `true` if the backend API is reachable.
+- `current_model`: The model currently configured in `Speech.toml` (or overridden).
+- `available_models`: List of models detected on the backend.
 
 ---
 
 ### `ManageBrain(action: String, param: String) → Bool`
 
-Perform administrative actions on the Ollama service.
+Perform administrative actions on the active AI service (Ollama or BitNet).
 
 ```bash
 # Start the service
@@ -797,9 +797,9 @@ busctl --user call org.speech.Service /org/speech/Service org.speech.Service Man
 **Parameters:**
 
 - `action`:
-  - `"start"`: Attempts to start the `ollama` service via `systemctl`.
-  - `"stop"`: Attempts to stop the `ollama` service via `systemctl`.
-  - `"pull"`: Initiates a model download.
+  - `"start"`: Attempts to start the backend service (e.g., `ollama` or `bitnet`) via `systemctl`.
+  - `"stop"`: Attempts to stop the backend service via `systemctl`.
+  - `"pull"`: Initiates a model download (Ollama only).
   - `"use"`: Switch to a different model at runtime (same as `SetBrainModel`).
 - `param`: Model name for `"pull"` or `"use"` actions (e.g., `"llama3:latest"`).
 
@@ -874,4 +874,4 @@ journalctl --user -u speechd-ng -f
 
 ---
 
-*Last Updated: 2026-01-10 (v1.0.0)*
+*Last Updated: 2026-01-21 (v1.0.2)*

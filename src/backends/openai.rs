@@ -39,6 +39,9 @@ impl BrainBackend for OpenAIBackend {
             .await
         {
             Ok(res) => {
+                if !res.status().is_success() {
+                    return Err(format!("AI Error: HTTP {}", res.status()));
+                }
                 if let Ok(json) = res.json::<serde_json::Value>().await {
                     Ok(json["choices"][0]["message"]["content"]
                         .as_str()
@@ -76,6 +79,12 @@ impl BrainBackend for OpenAIBackend {
 
             match res {
                 Ok(response) => {
+                    if !response.status().is_success() {
+                        let _ = token_tx
+                            .send(format!("Stream Error: HTTP {}", response.status()))
+                            .await;
+                        return;
+                    }
                     let mut stream = response.bytes_stream();
                     use futures_util::StreamExt;
                     while let Some(item) = stream.next().await {

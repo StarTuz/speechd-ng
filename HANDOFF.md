@@ -17,10 +17,13 @@
 
 ## Critical Features
 
-### 1. Zero-Latency Conversational AI
+### 1. Modular AI Architecture (`BrainBackend`)
 
-- **Streaming**: The `Cortex` now streams tokens from Ollama.
-- **Pipelined TTS**: The `Ear` and `AudioEngine` work in parallel; synthesis starts as soon as the first sentence boundary (`.`, `?`, `!`) is detected.
+SpeechD-NG is now backend-agnostic for AI reasoning.
+
+- **BrainBackend Trait**: Defines `prompt` and `stream` methods.
+- **Backends**: Native support for **Ollama** and **BitNet/OpenAI** APIs.
+- **Streaming**: Sentence-boundary synthesis started as soon as the first sentence is collected from the AI stream.
 
 ### 2. Native Speech Recognition
 
@@ -107,6 +110,30 @@ stt_backend = "vosk"  # High speed, pure rust
 enable_rag = true     # High-security local memory
 rag_top_k = 3
 ```
+
+---
+
+## 🧪 Quality & Testing (New: Phase 21 & 22)
+
+The system now includes a specialized AI validation layer to prevent regression during backend swaps.
+
+### 1. One-Click Verification
+
+Team members should run this after any change to the `cortex` or `backends` modules:
+
+```bash
+cargo test --test ai_integration
+```
+
+This mocks both **Ollama** and **OpenAI/BitNet** REST APIs, verifying trait integrity and stream parsing in <1s.
+
+### 2. Comparative Benchmarking (Phase 22)
+
+When evaluating new BitNet models vs Ollama baselines:
+
+- **Protocol**: Refer to `BITNET_COMPARISON_PROTOCOL.md` for metrics.
+- **Focus**: **TTFT** (Time To First Token) and **RSS Memory Footprint**.
+- **Requirement**: Use `speechd-control monitor` to capture real-time performance data.
 
 ---
 

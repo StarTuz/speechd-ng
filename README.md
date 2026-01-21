@@ -24,7 +24,7 @@
 | **Audio Engine** | Multi-backend mixer (eSpeak-ng + Piper). |
 | **The Ear** | Native audio capture with offline STT (Vosk/Whisper). Zero Python. |
 | **The Eye** | **OPTIONAL** Local Vision Model (Moondream 2). Side-car service. |
-| **The Cortex** | Async Ollama connector with token-based streaming. |
+| **The Cortex** | Multi-backend AI dispatcher (Ollama + BitNet/OpenAI). |
 | **The Chronicler** | Local vector database and embedding engine for long-term memory. |
 | **The Fingerprint** | Voice learning engine for STT error correction. |
 
@@ -78,8 +78,11 @@ Create `~/.config/speechd-ng/Speech.toml`:
 
 ```toml
 # LLM Settings
+ai_backend = "ollama"               # "ollama" or "bitnet" (OpenAI-compatible)
 ollama_url = "http://localhost:11434"
 ollama_model = "llama3"
+bitnet_url = "http://localhost:8000"
+bitnet_model = "models/bitnet_b1_58-3B"
 enable_ai = true                    # Set to false to disable LLM features (saves RAM)
 
 # TTS Settings

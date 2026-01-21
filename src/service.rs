@@ -693,38 +693,58 @@ impl SpeechService {
 
     #[zbus(name = "GetBrainStatus")]
     async fn get_brain_status(&self) -> (bool, String, Vec<String>) {
+        let (backend, model_cfg, url_cfg) = {
+            let s = crate::config_loader::SETTINGS.read().unwrap();
+            (
+                s.ai_backend.clone(),
+                if s.ai_backend == "bitnet" {
+                    s.bitnet_model.clone()
+                } else {
+                    s.ollama_model.clone()
+                },
+                if s.ai_backend == "bitnet" {
+                    s.bitnet_url.clone()
+                } else {
+                    s.ollama_url.clone()
+                },
+            )
+        };
+
         let model = self
             .model_override
             .lock()
             .unwrap()
             .clone()
-            .unwrap_or_else(|| {
-                crate::config_loader::SETTINGS
-                    .read()
-                    .map(|s| s.ollama_model.clone())
-                    .unwrap_or_else(|_| "unknown".to_string())
-            });
+            .unwrap_or(model_cfg);
 
-        let url = crate::config_loader::SETTINGS
-            .read()
-            .map(|s| s.ollama_url.clone())
-            .unwrap_or_else(|_| "http://localhost:11434".to_string());
+        let url = url_cfg;
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(2))
             .build()
             .unwrap_or_default();
 
-        let res = client.get(&format!("{}/api/tags", url)).send().await;
-
         let mut available = Vec::new();
+        let (ping_url, model_key) = if backend == "ollama" {
+            (format!("{}/api/tags", url), "models")
+        } else {
+            (format!("{}/v1/models", url), "data")
+        };
+
+        let res = client.get(&ping_url).send().await;
+
         let is_running = match res {
             Ok(resp) => {
                 if let Ok(json) = resp.json::<serde_json::Value>().await {
-                    if let Some(models) = json["models"].as_array() {
+                    if let Some(models) = json[model_key].as_array() {
                         for m in models {
-                            if let Some(name) = m["name"].as_str() {
-                                available.push(name.to_string());
+                            let name = if backend == "ollama" {
+                                m["name"].as_str()
+                            } else {
+                                m["id"].as_str()
+                            };
+                            if let Some(n) = name {
+                                available.push(n.to_string());
                             }
                         }
                     }
@@ -739,37 +759,57 @@ impl SpeechService {
 
     #[zbus(name = "ManageBrain")]
     async fn manage_brain(&self, action: String, param: String) -> bool {
+        let backend = crate::config_loader::SETTINGS
+            .read()
+            .unwrap()
+            .ai_backend
+            .clone();
+        let service_name = if backend == "bitnet" {
+            "bitnet"
+        } else {
+            "ollama"
+        };
+
         match action.as_str() {
             "start" => {
                 let _ = std::process::Command::new("systemctl")
-                    .args(["start", "ollama"])
+                    .args(["start", service_name])
                     .status();
                 std::process::Command::new("systemctl")
-                    .args(["--user", "start", "ollama"])
+                    .args(["--user", "start", service_name])
                     .status()
                     .is_ok()
             }
             "stop" => {
                 let _ = std::process::Command::new("systemctl")
-                    .args(["stop", "ollama"])
+                    .args(["stop", service_name])
                     .status();
                 std::process::Command::new("systemctl")
-                    .args(["--user", "stop", "ollama"])
+                    .args(["--user", "stop", service_name])
                     .status()
                     .is_ok()
             }
             "pull" => {
-                let url = {
-                    let settings = crate::config_loader::SETTINGS.read().unwrap();
-                    settings.ollama_url.clone()
-                };
-                let client = reqwest::Client::new();
-                let res = client
-                    .post(&format!("{}/api/pull", url))
-                    .json(&json!({"name": param, "stream": false}))
-                    .send()
-                    .await;
-                res.is_ok()
+                if backend == "ollama" {
+                    let url = crate::config_loader::SETTINGS
+                        .read()
+                        .unwrap()
+                        .ollama_url
+                        .clone();
+                    let client = reqwest::Client::new();
+                    let res = client
+                        .post(&format!("{}/api/pull", url))
+                        .json(&json!({"name": param, "stream": false}))
+                        .send()
+                        .await;
+                    res.is_ok()
+                } else {
+                    println!(
+                        "ManageBrain: 'pull' not supported for backend '{}'",
+                        backend
+                    );
+                    false
+                }
             }
             "use" => self.set_brain_model(param).await,
             _ => false,

@@ -1,6 +1,5 @@
 use crate::backends::{ollama::OllamaBackend, openai::OpenAIBackend, BrainBackend};
 use crate::chronicler::Chronicler;
-use crate::fingerprint::Fingerprint;
 use lazy_static::lazy_static;
 use regex::Regex;
 use reqwest::Client;

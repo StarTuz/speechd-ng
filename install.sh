@@ -223,14 +223,12 @@ if [ "$SKIP_CONFIG" != "true" ]; then
     echo ""
     echo "--- Wake Word Selection ---"
     echo "1) Wendy (default)"
-    echo "2) Alexa"
-    echo "3) Computer"
-    echo "4) Custom"
-    read -p "Select [1-4]: " ww_choice
+    echo "2) Computer"
+    echo "3) Custom"
+    read -p "Select [1-3]: " ww_choice
     case $ww_choice in
-        2) WAKE_WORD="alexa" ;;
-        3) WAKE_WORD="computer" ;;
-        4) read -p "Enter wake word: " WAKE_WORD ;;
+        2) WAKE_WORD="computer" ;;
+        3) read -p "Enter wake word: " WAKE_WORD ;;
         *) WAKE_WORD="wendy" ;;
     esac
 

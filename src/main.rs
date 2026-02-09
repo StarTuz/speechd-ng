@@ -43,6 +43,46 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Arc::new(chronicler::Chronicler::new(&db_path).expect("Failed to initialize Chronicler"))
     };
 
+    // Auto-start BitNet if configured
+    {
+        let settings = config_loader::SETTINGS.read().unwrap();
+        let should_start = settings.bitnet_auto_start
+            && matches!(settings.ai_backend.as_str(), "bitnet" | "auto");
+        let bitnet_url = settings.bitnet_url.clone();
+        drop(settings);
+
+        if should_start {
+            let probe_url = format!("{}/v1/models", bitnet_url.trim_end_matches('/'));
+            let alive = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(2))
+                .build()
+                .ok()
+                .map(|c| c.get(&probe_url).send());
+
+            let already_running = if let Some(fut) = alive {
+                fut.await.map(|r| r.status().is_success()).unwrap_or(false)
+            } else {
+                false
+            };
+
+            if already_running {
+                println!("BitNet: already running at {}", bitnet_url);
+            } else {
+                println!("BitNet: not reachable, starting via systemctl...");
+                let user_ok = std::process::Command::new("systemctl")
+                    .args(["--user", "start", "bitnet"])
+                    .status()
+                    .map(|s| s.success())
+                    .unwrap_or(false);
+                if !user_ok {
+                    let _ = std::process::Command::new("systemctl")
+                        .args(["start", "bitnet"])
+                        .status();
+                }
+            }
+        }
+    }
+
     let cortex = Cortex::new(chronicler.clone());
 
     // Parse CLI arguments

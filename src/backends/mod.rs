@@ -16,6 +16,7 @@ pub trait BrainBackend: Send + Sync {
     ) -> Receiver<String>;
 }
 
+pub mod fallback;
 pub mod ollama;
 pub mod openai;
 

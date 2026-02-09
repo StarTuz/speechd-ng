@@ -7,9 +7,10 @@ use std::sync::RwLock;
 pub struct Settings {
     pub ollama_url: String,
     pub ollama_model: String,
-    pub ai_backend: String, // "ollama" or "bitnet"
+    pub ai_backend: String, // "ollama", "bitnet", or "auto"
     pub bitnet_url: String,
     pub bitnet_model: String,
+    pub bitnet_auto_start: bool,
     pub enable_ai: bool,
     pub enable_vision: bool,
     pub passive_confidence_threshold: f32,
@@ -57,9 +58,10 @@ impl Default for Settings {
         Self {
             ollama_url: "http://localhost:11434".to_string(),
             ollama_model: "llama3".to_string(),
-            ai_backend: "ollama".to_string(),
+            ai_backend: "bitnet".to_string(),
             bitnet_url: "http://localhost:8000".to_string(),
             bitnet_model: "models/bitnet_b1_58-3B".to_string(),
+            bitnet_auto_start: true,
             enable_ai: true,
             enable_vision: false,
             passive_confidence_threshold: 0.1,
@@ -123,9 +125,10 @@ impl Settings {
             // Connect to defaults
             .set_default("ollama_url", "http://localhost:11434")?
             .set_default("ollama_model", "llama3")?
-            .set_default("ai_backend", "ollama")?
+            .set_default("ai_backend", "bitnet")?
             .set_default("bitnet_url", "http://localhost:8000")?
             .set_default("bitnet_model", "models/bitnet_b1_58-3B")?
+            .set_default("bitnet_auto_start", true)?
             .set_default("enable_ai", true)?
             .set_default("enable_vision", false)?
             .set_default("passive_confidence_threshold", 0.1)?

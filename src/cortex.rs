@@ -123,17 +123,24 @@ impl Cortex {
 
         let backend: Arc<dyn BrainBackend + Send + Sync> = {
             let s = crate::config_loader::SETTINGS.read().unwrap();
+            let bitnet = Arc::new(OpenAIBackend::new(
+                s.bitnet_url.clone(),
+                s.bitnet_model.clone(),
+                client.clone(),
+            ));
+            let ollama = Arc::new(OllamaBackend::new(
+                s.ollama_url.clone(),
+                s.ollama_model.clone(),
+                client.clone(),
+            ));
+
             match s.ai_backend.as_str() {
-                "bitnet" => Arc::new(OpenAIBackend::new(
-                    s.bitnet_url.clone(),
-                    s.bitnet_model.clone(),
-                    client.clone(),
+                "bitnet" => bitnet,
+                "ollama" => ollama,
+                "auto" => Arc::new(crate::backends::fallback::FallbackBackend::new(
+                    bitnet, ollama,
                 )),
-                _ => Arc::new(OllamaBackend::new(
-                    s.ollama_url.clone(),
-                    s.ollama_model.clone(),
-                    client.clone(),
-                )),
+                _ => bitnet, // Default to BitNet as primary interface
             }
         };
 

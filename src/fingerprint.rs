@@ -64,6 +64,23 @@ impl Fingerprint {
         }
     }
 
+    /// Create a Fingerprint with a custom storage path (for testing)
+    pub fn new_with_path(path: PathBuf) -> Self {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).ok();
+        }
+        let data = if path.exists() {
+            let content = fs::read_to_string(&path).unwrap_or_default();
+            serde_json::from_str(&content).unwrap_or_default()
+        } else {
+            FingerprintData::default()
+        };
+        Self {
+            path,
+            data: Arc::new(Mutex::new(data)),
+        }
+    }
+
     pub fn passive_learn(&self, asr_heard: &str, final_text: &str) {
         let asr_words: HashSet<&str> = asr_heard.split_whitespace().collect();
         let final_words: HashSet<&str> = final_text.split_whitespace().collect();
@@ -89,7 +106,7 @@ impl Fingerprint {
             .map(|s| s.passive_confidence_threshold)
             .unwrap_or(0.1);
 
-        let mut data = self.data.lock().unwrap();
+        let mut data = self.data.lock().unwrap_or_else(|p| p.into_inner());
         
         // Undo State
         let heard_lower = heard.to_lowercase();
@@ -136,7 +153,7 @@ impl Fingerprint {
             return false;
         }
 
-        let mut data = self.data.lock().unwrap();
+        let mut data = self.data.lock().unwrap_or_else(|p| p.into_inner());
         let heard_lower = heard.to_lowercase();
         let meant_lower = meant.to_lowercase();
         
@@ -177,7 +194,7 @@ impl Fingerprint {
 
     /// Rollback the last correction (manual or passive) via undo stack
     pub fn rollback_last_correction(&self) -> bool {
-        let mut data = self.data.lock().unwrap();
+        let mut data = self.data.lock().unwrap_or_else(|p| p.into_inner());
         if let Some(undo) = data.undo_stack.pop() {
             if let Some(prev) = undo.previous_pattern {
                 println!("Fingerprint: Rolling back '{}' to previous state", undo.heard);
@@ -201,7 +218,7 @@ impl Fingerprint {
     }
 
     pub fn get_corrections_prompt(&self, text: &str) -> String {
-        let data = self.data.lock().unwrap();
+        let data = self.data.lock().unwrap_or_else(|p| p.into_inner());
         let mut prompt_parts = Vec::new();
         let words: Vec<&str> = text.split_whitespace().collect();
 
@@ -232,7 +249,7 @@ impl Fingerprint {
 
     /// Get statistics about the fingerprint
     pub fn get_stats(&self) -> (u32, u32, u32) {
-        let data = self.data.lock().unwrap();
+        let data = self.data.lock().unwrap_or_else(|p| p.into_inner());
         let manual_count = data.patterns.values()
             .filter(|p| p.source == "manual")
             .count() as u32;
@@ -245,7 +262,7 @@ impl Fingerprint {
 
     /// Get all patterns for debugging/export
     pub fn get_all_patterns(&self) -> Vec<(String, String, f32, String)> {
-        let data = self.data.lock().unwrap();
+        let data = self.data.lock().unwrap_or_else(|p| p.into_inner());
         data.patterns.iter()
             .map(|(heard, p)| (heard.clone(), p.correction.clone(), p.confidence, p.source.clone()))
             .collect()
@@ -254,7 +271,7 @@ impl Fingerprint {
     /// Export fingerprint to a file
     /// Returns true if successful
     pub fn export_to_path(&self, path: &str) -> bool {
-        let data = self.data.lock().unwrap();
+        let data = self.data.lock().unwrap_or_else(|p| p.into_inner());
         match serde_json::to_string_pretty(&*data) {
             Ok(content) => {
                 match fs::write(path, content) {
@@ -296,7 +313,7 @@ impl Fingerprint {
             }
         };
 
-        let mut data = self.data.lock().unwrap();
+        let mut data = self.data.lock().unwrap_or_else(|p| p.into_inner());
         
         if merge {
             // Merge: imported patterns fill in gaps, don't overwrite existing
@@ -331,7 +348,7 @@ impl Fingerprint {
             return;
         }
 
-        let mut data = self.data.lock().unwrap();
+        let mut data = self.data.lock().unwrap_or_else(|p| p.into_inner());
         
         // Don't add duplicates (check last 10)
         let recent: Vec<_> = data.ignored_commands.iter().rev().take(10).collect();
@@ -358,7 +375,7 @@ impl Fingerprint {
 
     /// Get all ignored commands for review
     pub fn get_ignored_commands(&self) -> Vec<(String, String, String)> {
-        let data = self.data.lock().unwrap();
+        let data = self.data.lock().unwrap_or_else(|p| p.into_inner());
         data.ignored_commands.iter()
             .map(|c| (c.heard.clone(), c.timestamp.clone(), c.context.clone()))
             .collect()
@@ -366,7 +383,7 @@ impl Fingerprint {
 
     /// Clear all ignored commands
     pub fn clear_ignored_commands(&self) -> u32 {
-        let mut data = self.data.lock().unwrap();
+        let mut data = self.data.lock().unwrap_or_else(|p| p.into_inner());
         let count = data.ignored_commands.len() as u32;
         data.ignored_commands.clear();
         self.save(&data);
@@ -377,7 +394,7 @@ impl Fingerprint {
     /// Correct an ignored command - adds it as a pattern and removes from ignored
     /// Returns true if the command was found and corrected
     pub fn correct_ignored_command(&self, heard: &str, meant: &str) -> bool {
-        let mut data = self.data.lock().unwrap();
+        let mut data = self.data.lock().unwrap_or_else(|p| p.into_inner());
         
         // Find and remove from ignored list
         let original_len = data.ignored_commands.len();
@@ -402,5 +419,95 @@ impl Fingerprint {
         if let Ok(content) = serde_json::to_string_pretty(data) {
             fs::write(&self.path, content).ok();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn test_fingerprint() -> (Fingerprint, TempDir) {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("fingerprint.json");
+        (Fingerprint::new_with_path(path), dir)
+    }
+
+    #[test]
+    fn test_manual_correction_basic() {
+        let (fp, _dir) = test_fingerprint();
+        let result = fp.add_manual_correction("teh".to_string(), "the".to_string());
+        assert!(result);
+        let patterns = fp.get_all_patterns();
+        assert_eq!(patterns.len(), 1);
+        assert_eq!(patterns[0].0, "teh");
+        assert_eq!(patterns[0].1, "the");
+    }
+
+    #[test]
+    fn test_manual_correction_empty_rejected() {
+        let (fp, _dir) = test_fingerprint();
+        assert!(!fp.add_manual_correction("".to_string(), "the".to_string()));
+        assert!(!fp.add_manual_correction("teh".to_string(), "".to_string()));
+        assert!(fp.get_all_patterns().is_empty());
+    }
+
+    #[test]
+    fn test_manual_correction_same_rejected() {
+        let (fp, _dir) = test_fingerprint();
+        assert!(!fp.add_manual_correction("hello".to_string(), "hello".to_string()));
+        assert!(fp.get_all_patterns().is_empty());
+    }
+
+    #[test]
+    fn test_passive_learn_single_word_correction() {
+        let (fp, _dir) = test_fingerprint();
+        fp.passive_learn("hello wrold", "hello world");
+        let patterns = fp.get_all_patterns();
+        assert_eq!(patterns.len(), 1);
+        assert_eq!(patterns[0].0, "wrold");
+        assert_eq!(patterns[0].1, "world");
+    }
+
+    #[test]
+    fn test_rollback() {
+        let (fp, _dir) = test_fingerprint();
+        fp.add_manual_correction("teh".to_string(), "the".to_string());
+        assert_eq!(fp.get_all_patterns().len(), 1);
+        assert!(fp.rollback_last_correction());
+        assert!(fp.get_all_patterns().is_empty());
+    }
+
+    #[test]
+    fn test_rollback_empty_stack() {
+        let (fp, _dir) = test_fingerprint();
+        assert!(!fp.rollback_last_correction());
+    }
+
+    #[test]
+    fn test_stats() {
+        let (fp, _dir) = test_fingerprint();
+        fp.add_manual_correction("teh".to_string(), "the".to_string());
+        fp.add_passive_correction("wrold".to_string(), "world".to_string());
+        let (manual, passive, _commands) = fp.get_stats();
+        assert_eq!(manual, 1);
+        assert_eq!(passive, 1);
+    }
+
+    #[test]
+    fn test_ignored_commands_lifecycle() {
+        let (fp, _dir) = test_fingerprint();
+        fp.add_ignored_command("foobar", "testing");
+        let ignored = fp.get_ignored_commands();
+        assert_eq!(ignored.len(), 1);
+        assert_eq!(ignored[0].0, "foobar");
+
+        // Correct the ignored command
+        assert!(fp.correct_ignored_command("foobar", "foo bar"));
+        assert!(fp.get_ignored_commands().is_empty());
+
+        // Should now exist as a pattern
+        let patterns = fp.get_all_patterns();
+        assert_eq!(patterns.len(), 1);
     }
 }

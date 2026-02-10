@@ -4,7 +4,7 @@ use serial_test::serial;
 use speechd_ng::backends::ollama::OllamaBackend;
 use speechd_ng::backends::openai::OpenAIBackend;
 use speechd_ng::backends::BrainBackend;
-use tokio::sync::mpsc::Receiver;
+use speechd_ng::error::SpeechdError;
 
 #[tokio::test]
 #[serial]
@@ -44,7 +44,10 @@ async fn test_ollama_backend_prompt_error_status() {
     let result = backend.prompt("sys", "ctx", "user").await;
 
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("AI Error: HTTP 500"));
+    let err = result.unwrap_err();
+    assert!(matches!(err, SpeechdError::AiHttp { .. }));
+    // Backward-compatible display
+    assert_eq!(err.to_string(), "AI Error: HTTP 500 Internal Server Error");
 }
 
 #[tokio::test]
@@ -97,11 +100,13 @@ async fn test_ollama_backend_stream() {
         .await;
 
     let backend = OllamaBackend::new(url, "test-model".into(), Client::new());
-    let mut rx: Receiver<String> = backend.stream("sys", "ctx", "user", None).await;
+    let mut rx = backend.stream("sys", "ctx", "user", None).await;
 
     let mut response = String::new();
-    while let Some(token) = rx.recv().await {
-        response.push_str(&token);
+    while let Some(result) = rx.recv().await {
+        if let Ok(token) = result {
+            response.push_str(&token);
+        }
     }
 
     assert_eq!(response, "Part 1Part 2");
@@ -125,12 +130,36 @@ async fn test_openai_backend_stream() {
         .await;
 
     let backend = OpenAIBackend::new(url, "test-model".into(), Client::new());
-    let mut rx: Receiver<String> = backend.stream("sys", "ctx", "user", None).await;
+    let mut rx = backend.stream("sys", "ctx", "user", None).await;
 
     let mut response = String::new();
-    while let Some(token) = rx.recv().await {
-        response.push_str(&token);
+    while let Some(result) = rx.recv().await {
+        if let Ok(token) = result {
+            response.push_str(&token);
+        }
     }
 
     assert_eq!(response, "Hello World");
+}
+
+#[test]
+fn test_error_display_backward_compat() {
+    assert_eq!(
+        SpeechdError::AiHttp {
+            status: "500 Internal Server Error".into()
+        }
+        .to_string(),
+        "AI Error: HTTP 500 Internal Server Error"
+    );
+    assert_eq!(
+        SpeechdError::StreamHttp {
+            status: "503 Service Unavailable".into()
+        }
+        .to_string(),
+        "Stream Error: HTTP 503 Service Unavailable"
+    );
+    assert_eq!(
+        SpeechdError::AiParseFailed.to_string(),
+        "Failed to parse AI response."
+    );
 }

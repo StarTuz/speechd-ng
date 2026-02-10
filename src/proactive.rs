@@ -43,7 +43,7 @@ impl ProactiveManager {
 
     pub fn add_timer(&self, duration: Duration, message: String) {
         println!("Proactive: Timer set for {:?}: '{}'", duration, message);
-        let mut timers = self.timers.lock().unwrap();
+        let mut timers = self.timers.lock().unwrap_or_else(|p| p.into_inner());
         timers.push(Timer {
             deadline: Instant::now() + duration,
             message,
@@ -51,7 +51,7 @@ impl ProactiveManager {
     }
 
     pub fn reset_rate_limit(&self) {
-        let mut last = self.last_speech.lock().unwrap();
+        let mut last = self.last_speech.lock().unwrap_or_else(|p| p.into_inner());
         *last = Instant::now() - Duration::from_secs(60);
     }
 
@@ -64,7 +64,7 @@ impl ProactiveManager {
 
                 let expired_timers;
                 {
-                    let mut timers = manager.timers.lock().unwrap();
+                    let mut timers = manager.timers.lock().unwrap_or_else(|p| p.into_inner());
                     let now = Instant::now();
                     // Drain expired timers
                     let (expired, remaining): (Vec<Timer>, Vec<Timer>) =
@@ -191,7 +191,7 @@ impl ProactiveManager {
 
         // Rate limiting logic
         {
-            let mut last = self.last_speech.lock().unwrap();
+            let mut last = self.last_speech.lock().unwrap_or_else(|p| p.into_inner());
             if last.elapsed() < Duration::from_secs(30) {
                 // Too soon to speak again automatically
                 println!("Proactive event suppressed due to rate limiting.");

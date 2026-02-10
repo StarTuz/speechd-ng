@@ -83,7 +83,7 @@ impl RateLimiter {
         // Use burst size = 1 minute worth
         let max_tokens = limit;
 
-        let mut buckets = self.buckets.lock().unwrap();
+        let mut buckets = self.buckets.lock().unwrap_or_else(|p| p.into_inner());
         let key = (sender.to_string(), limit_type);
 
         let bucket = buckets
@@ -96,7 +96,7 @@ impl RateLimiter {
     /// Get remaining tokens for a sender/type (for debugging/info)
     #[allow(dead_code)]
     pub fn remaining(&self, sender: &str, limit_type: LimitType) -> f32 {
-        let buckets = self.buckets.lock().unwrap();
+        let buckets = self.buckets.lock().unwrap_or_else(|p| p.into_inner());
         let key = (sender.to_string(), limit_type);
 
         buckets
@@ -107,7 +107,7 @@ impl RateLimiter {
 
     /// Clean up old entries (senders not seen recently)
     pub fn cleanup(&self, max_age_secs: u64) {
-        let mut buckets = self.buckets.lock().unwrap();
+        let mut buckets = self.buckets.lock().unwrap_or_else(|p| p.into_inner());
         let now = Instant::now();
 
         buckets.retain(|_, bucket| now.duration_since(bucket.last_update).as_secs() < max_age_secs);
@@ -117,5 +117,68 @@ impl RateLimiter {
 impl Default for RateLimiter {
     fn default() -> Self {
         Self::new(30, 10, 20, 30) // Default limits per minute
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_token_exhaustion() {
+        let limiter = RateLimiter::new(2, 10, 20, 30);
+        assert!(limiter.check("sender1", LimitType::Tts));
+        assert!(limiter.check("sender1", LimitType::Tts));
+        // Third call should be rate limited
+        assert!(!limiter.check("sender1", LimitType::Tts));
+    }
+
+    #[test]
+    fn test_per_sender_independence() {
+        let limiter = RateLimiter::new(1, 10, 20, 30);
+        assert!(limiter.check("alice", LimitType::Tts));
+        assert!(!limiter.check("alice", LimitType::Tts));
+        // Different sender should still have tokens
+        assert!(limiter.check("bob", LimitType::Tts));
+    }
+
+    #[test]
+    fn test_per_type_independence() {
+        let limiter = RateLimiter::new(1, 1, 1, 1);
+        assert!(limiter.check("sender1", LimitType::Tts));
+        assert!(!limiter.check("sender1", LimitType::Tts));
+        // Different type should still have tokens
+        assert!(limiter.check("sender1", LimitType::Ai));
+        assert!(limiter.check("sender1", LimitType::Audio));
+        assert!(limiter.check("sender1", LimitType::Listen));
+    }
+
+    #[test]
+    fn test_cleanup_removes_old_entries() {
+        let limiter = RateLimiter::new(10, 10, 10, 10);
+        limiter.check("old_sender", LimitType::Tts);
+        // Cleanup with max_age_secs=0 should remove everything
+        limiter.cleanup(0);
+        let buckets = limiter.buckets.lock().unwrap();
+        assert!(buckets.is_empty());
+    }
+
+    #[test]
+    fn test_cleanup_retains_recent() {
+        let limiter = RateLimiter::new(10, 10, 10, 10);
+        limiter.check("recent_sender", LimitType::Tts);
+        // Cleanup with large max_age should retain
+        limiter.cleanup(3600);
+        let buckets = limiter.buckets.lock().unwrap();
+        assert!(!buckets.is_empty());
+    }
+
+    #[test]
+    fn test_remaining_count() {
+        let limiter = RateLimiter::new(5, 10, 20, 30);
+        limiter.check("sender1", LimitType::Tts);
+        let remaining = limiter.remaining("sender1", LimitType::Tts);
+        // Should be approximately 4.0 (5 - 1, possibly slightly more from refill)
+        assert!(remaining >= 3.9 && remaining <= 4.1);
     }
 }

@@ -1,3 +1,4 @@
+use crate::error::SpeechdError;
 use config::{Config, File};
 use lazy_static::lazy_static;
 use serde::Deserialize;
@@ -119,6 +120,27 @@ lazy_static! {
         RwLock::new(Settings::new().expect("Failed to load settings"));
 }
 
+/// Read settings with a closure, returning a default if the lock is poisoned.
+pub fn read_settings<T>(f: impl FnOnce(&Settings) -> T, default: T) -> T {
+    SETTINGS.read().map(|s| f(&s)).unwrap_or(default)
+}
+
+/// Read settings with a closure, returning an error if the lock is poisoned.
+pub fn try_read_settings<T>(f: impl FnOnce(&Settings) -> T) -> Result<T, SpeechdError> {
+    SETTINGS
+        .read()
+        .map(|s| f(&s))
+        .map_err(|_| SpeechdError::SettingsPoisoned)
+}
+
+/// Write settings with a closure, returning an error if the lock is poisoned.
+pub fn try_write_settings<T>(f: impl FnOnce(&mut Settings) -> T) -> Result<T, SpeechdError> {
+    SETTINGS
+        .write()
+        .map(|mut s| f(&mut s))
+        .map_err(|_| SpeechdError::SettingsPoisoned)
+}
+
 impl Settings {
     pub fn new() -> Result<Self, config::ConfigError> {
         let builder = Config::builder()
@@ -225,5 +247,40 @@ mod tests {
     fn test_config_load() {
         let settings = Settings::new().expect("Failed to load settings");
         assert!(settings.memory_size > 0);
+    }
+
+    #[test]
+    fn test_default_settings_pass_validation() {
+        let settings = Settings::default();
+        assert!(settings.validate().is_ok());
+    }
+
+    #[test]
+    fn test_invalid_volume_rejected() {
+        let mut settings = Settings::default();
+        settings.playback_volume = 1.5;
+        assert!(settings.validate().is_err());
+
+        settings.playback_volume = -0.1;
+        assert!(settings.validate().is_err());
+    }
+
+    #[test]
+    fn test_zero_memory_size_rejected() {
+        let mut settings = Settings::default();
+        settings.memory_size = 0;
+        assert!(settings.validate().is_err());
+    }
+
+    #[test]
+    fn test_read_settings_returns_value() {
+        let result = read_settings(|s| s.memory_size, 0);
+        assert!(result > 0);
+    }
+
+    #[test]
+    fn test_try_read_settings_returns_ok() {
+        let result = try_read_settings(|s| s.enable_ai);
+        assert!(result.is_ok());
     }
 }

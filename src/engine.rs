@@ -133,10 +133,8 @@ impl AudioEngine {
                 }
             };
 
-            let mut current_volume: f32 = {
-                let s = crate::config_loader::SETTINGS.read().unwrap();
-                s.playback_volume
-            };
+            let mut current_volume: f32 =
+                crate::config_loader::read_settings(|s| s.playback_volume, 1.0);
             let mut current_url: Option<String> = None;
             let mut active_sinks: Vec<(Sink, Option<oneshot::Sender<()>>, usize)> = Vec::new();
 
@@ -261,14 +259,17 @@ impl AudioEngine {
                         let tx_clone = thread_tx.clone();
                         let total_size_counter = total_size_worker_clone.clone();
                         tokio::spawn(async move {
-                            let (max_size_mb, global_max_size_mb, timeout_secs) = {
-                                let s = crate::config_loader::SETTINGS.read().unwrap();
-                                (
-                                    s.max_audio_size_mb,
-                                    s.global_audio_buffer_limit_mb,
-                                    s.playback_timeout_secs,
-                                )
-                            };
+                            let (max_size_mb, global_max_size_mb, timeout_secs) =
+                                crate::config_loader::read_settings(
+                                    |s| {
+                                        (
+                                            s.max_audio_size_mb,
+                                            s.global_audio_buffer_limit_mb,
+                                            s.playback_timeout_secs,
+                                        )
+                                    },
+                                    (50, 200, 30),
+                                );
                             let max_size_bytes = max_size_mb * 1024 * 1024;
                             let global_max_bytes = global_max_size_mb * 1024 * 1024;
                             let client = match reqwest::Client::builder()
@@ -385,14 +386,17 @@ impl AudioEngine {
                         let tx_clone = thread_tx.clone();
                         let total_size_counter = total_size_worker_clone.clone();
                         tokio::spawn(async move {
-                            let (max_size_mb, global_max_size_mb, timeout_secs) = {
-                                let s = crate::config_loader::SETTINGS.read().unwrap();
-                                (
-                                    s.max_audio_size_mb,
-                                    s.global_audio_buffer_limit_mb,
-                                    s.playback_timeout_secs,
-                                )
-                            };
+                            let (max_size_mb, global_max_size_mb, timeout_secs) =
+                                crate::config_loader::read_settings(
+                                    |s| {
+                                        (
+                                            s.max_audio_size_mb,
+                                            s.global_audio_buffer_limit_mb,
+                                            s.playback_timeout_secs,
+                                        )
+                                    },
+                                    (50, 200, 30),
+                                );
                             let max_size_bytes = max_size_mb * 1024 * 1024;
                             let global_max_bytes = global_max_size_mb * 1024 * 1024;
                             let client = match reqwest::Client::builder()
@@ -513,10 +517,10 @@ impl AudioEngine {
         let tx = self.tx.clone();
         let text = text.to_string();
         tokio::spawn(async move {
-            let (piper, default) = {
-                let s = crate::config_loader::SETTINGS.read().unwrap();
-                (s.piper_model.clone(), s.tts_backend.clone())
-            };
+            let (piper, default) = crate::config_loader::read_settings(
+                |s| (s.piper_model.clone(), s.tts_backend.clone()),
+                ("en_US-lessac-medium".to_string(), "espeak".to_string()),
+            );
             let (target, actual_v) = if let Some(ref v) = voice {
                 if v.starts_with("piper:") {
                     ("piper".to_string(), Some(v[6..].to_string()))
@@ -555,10 +559,10 @@ impl AudioEngine {
         let tx = self.tx.clone();
         let text = text.to_string();
         tokio::spawn(async move {
-            let (piper, default) = {
-                let s = crate::config_loader::SETTINGS.read().unwrap();
-                (s.piper_model.clone(), s.tts_backend.clone())
-            };
+            let (piper, default) = crate::config_loader::read_settings(
+                |s| (s.piper_model.clone(), s.tts_backend.clone()),
+                ("en_US-lessac-medium".to_string(), "espeak".to_string()),
+            );
             let (target, actual_v) = if let Some(ref v) = voice {
                 if v.starts_with("piper:") {
                     ("piper".to_string(), Some(v[6..].to_string()))
@@ -646,10 +650,10 @@ impl AudioEngine {
         let text = text.to_string();
         let channel = channel.to_string();
         tokio::spawn(async move {
-            let (piper, default) = {
-                let s = crate::config_loader::SETTINGS.read().unwrap();
-                (s.piper_model.clone(), s.tts_backend.clone())
-            };
+            let (piper, default) = crate::config_loader::read_settings(
+                |s| (s.piper_model.clone(), s.tts_backend.clone()),
+                ("en_US-lessac-medium".to_string(), "espeak".to_string()),
+            );
             let (target, actual_v) = if let Some(ref v) = voice {
                 if v.starts_with("piper:") {
                     ("piper".to_string(), Some(v[6..].to_string()))

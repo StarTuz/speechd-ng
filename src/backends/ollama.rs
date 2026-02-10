@@ -1,4 +1,5 @@
 use crate::backends::BrainBackend;
+use crate::error::SpeechdError;
 use async_trait::async_trait;
 use reqwest::Client;
 use serde_json::json;
@@ -18,7 +19,12 @@ impl OllamaBackend {
 
 #[async_trait]
 impl BrainBackend for OllamaBackend {
-    async fn prompt(&self, system: &str, context: &str, user: &str) -> Result<String, String> {
+    async fn prompt(
+        &self,
+        system: &str,
+        context: &str,
+        user: &str,
+    ) -> Result<String, SpeechdError> {
         let payload = json!({
             "model": self.model,
             "system": system,
@@ -35,7 +41,9 @@ impl BrainBackend for OllamaBackend {
         {
             Ok(res) => {
                 if !res.status().is_success() {
-                    return Err(format!("AI Error: HTTP {}", res.status()));
+                    return Err(SpeechdError::AiHttp {
+                        status: res.status().to_string(),
+                    });
                 }
                 if let Ok(json) = res.json::<serde_json::Value>().await {
                     Ok(json["response"]
@@ -43,10 +51,12 @@ impl BrainBackend for OllamaBackend {
                         .unwrap_or("No response from AI.")
                         .to_string())
                 } else {
-                    Err("Failed to parse AI response.".into())
+                    Err(SpeechdError::AiParseFailed)
                 }
             }
-            Err(e) => Err(format!("AI Error: {}", e)),
+            Err(e) => Err(SpeechdError::AiConnection {
+                detail: e.to_string(),
+            }),
         }
     }
 
@@ -56,8 +66,8 @@ impl BrainBackend for OllamaBackend {
         context: &str,
         user: &str,
         images: Option<Vec<String>>,
-    ) -> Receiver<String> {
-        let (token_tx, token_rx) = channel::<String>(100);
+    ) -> Receiver<Result<String, SpeechdError>> {
+        let (token_tx, token_rx) = channel::<Result<String, SpeechdError>>(100);
         let url = format!("{}/api/generate", self.url);
         let client = self.client.clone();
         let payload = json!({
@@ -75,7 +85,9 @@ impl BrainBackend for OllamaBackend {
                 Ok(response) => {
                     if !response.status().is_success() {
                         let _ = token_tx
-                            .send(format!("Stream Error: HTTP {}", response.status()))
+                            .send(Err(SpeechdError::StreamHttp {
+                                status: response.status().to_string(),
+                            }))
                             .await;
                         return;
                     }
@@ -90,10 +102,11 @@ impl BrainBackend for OllamaBackend {
                                 if trimmed.is_empty() {
                                     continue;
                                 }
-                                if let Ok(json) = serde_json::from_str::<serde_json::Value>(trimmed)
+                                if let Ok(json) =
+                                    serde_json::from_str::<serde_json::Value>(trimmed)
                                 {
                                     if let Some(token) = json["response"].as_str() {
-                                        let _ = token_tx.send(token.to_string()).await;
+                                        let _ = token_tx.send(Ok(token.to_string())).await;
                                     }
                                 }
                             }
@@ -101,7 +114,11 @@ impl BrainBackend for OllamaBackend {
                     }
                 }
                 Err(e) => {
-                    let _ = token_tx.send(format!("Stream Error: {}", e)).await;
+                    let _ = token_tx
+                        .send(Err(SpeechdError::StreamConnection {
+                            detail: e.to_string(),
+                        }))
+                        .await;
                 }
             }
         });

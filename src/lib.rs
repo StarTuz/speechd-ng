@@ -5,11 +5,13 @@ pub mod context;
 pub mod cortex;
 pub mod ear;
 pub mod engine;
+pub mod error;
 pub mod fingerprint;
 pub mod proactive;
 pub mod rate_limiter;
 pub mod security;
 pub mod service;
+pub mod service_helpers;
 pub mod ssip;
 pub mod wyoming;
 

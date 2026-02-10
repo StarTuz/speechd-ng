@@ -2,18 +2,25 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Receiver;
 
+use crate::error::SpeechdError;
+
 // --- AI / Brain Backends (Phase 20) ---
 
 #[async_trait]
 pub trait BrainBackend: Send + Sync {
-    async fn prompt(&self, system: &str, context: &str, user: &str) -> Result<String, String>;
+    async fn prompt(
+        &self,
+        system: &str,
+        context: &str,
+        user: &str,
+    ) -> Result<String, SpeechdError>;
     async fn stream(
         &self,
         system: &str,
         context: &str,
         user: &str,
         images: Option<Vec<String>>,
-    ) -> Receiver<String>;
+    ) -> Receiver<Result<String, SpeechdError>>;
 }
 
 pub mod fallback;

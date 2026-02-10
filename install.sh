@@ -10,7 +10,7 @@ BIN_DIR="$HOME/.local/bin"
 SYSTEMD_DIR="$HOME/.config/systemd/user"
 
 echo "========================================"
-echo "   SpeechD-NG Installer (v1.0.0)"
+echo "   SpeechD-NG Installer (v1.1.0)"
 echo "========================================"
 
 # Check if we're in the source directory
@@ -234,20 +234,31 @@ if [ "$SKIP_CONFIG" != "true" ]; then
 
     echo ""
     echo "--- AI Brain Selection ---"
-    echo "1) Ollama (Native REST - Default)"
-    echo "2) BitNet / OpenAI Proxy (OpenAI-compatible)"
-    read -p "Select AI Backend [1-2]: " ai_choice
-    if [ "$ai_choice" == "2" ]; then
-        AI_BACKEND="bitnet"
-        ENABLE_AI="true"
-    else
-        AI_BACKEND="ollama"
-        read -p "Enable Ollama AI integration? [y/N]: " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo "1) BitNet (Local, auto-start - Default)"
+    echo "2) Ollama (Native REST)"
+    echo "3) Auto (BitNet primary, Ollama fallback)"
+    read -p "Select AI Backend [1-3]: " ai_choice
+    case $ai_choice in
+        2)
+            AI_BACKEND="ollama"
+            BITNET_AUTO_START="false"
+            read -p "Enable Ollama AI integration? [y/N]: " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                ENABLE_AI="true"
+            fi
+            ;;
+        3)
+            AI_BACKEND="auto"
+            BITNET_AUTO_START="true"
             ENABLE_AI="true"
-        fi
-    fi
+            ;;
+        *)
+            AI_BACKEND="bitnet"
+            BITNET_AUTO_START="true"
+            ENABLE_AI="true"
+            ;;
+    esac
 
     echo ""
     echo "--- Speech to Text ---"
@@ -269,10 +280,13 @@ ollama_url = "http://localhost:11434"
 ollama_model = "llama3"
 bitnet_url = "http://localhost:8000"
 bitnet_model = "models/bitnet_b1_58-3B"
+bitnet_auto_start = $BITNET_AUTO_START
 enable_ai = $ENABLE_AI
+enable_vision = false
 passive_confidence_threshold = 0.1
 memory_size = 50
 enable_rag = false
+rag_top_k = 3
 
 # Audio
 enable_audio = true

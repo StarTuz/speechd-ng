@@ -61,13 +61,10 @@ impl Ear {
         engine: Arc<dyn AudioOutput + Send + Sync>,
         cortex: Cortex,
     ) {
-        let (model_path, threshold) = {
-            let config = crate::config_loader::SETTINGS.read().unwrap();
-            (
-                config.vosk_model_path.clone(),
-                config.passive_confidence_threshold,
-            )
-        };
+        let (model_path, threshold) = crate::config_loader::read_settings(
+            |s| (s.vosk_model_path.clone(), s.passive_confidence_threshold),
+            ("/usr/share/vosk/model".to_string(), 0.1),
+        );
         self.run(cortex, engine, model_path, threshold);
     }
 
@@ -106,11 +103,7 @@ impl Ear {
             Recognizer::new(&model, 16000.0).ok_or("Failed to create recognizer")?;
 
         // Governance Check: Microphone Permission
-        if !crate::config_loader::SETTINGS
-            .read()
-            .unwrap()
-            .enable_microphone
-        {
+        if !crate::config_loader::read_settings(|s| s.enable_microphone, false) {
             return Err(
                 "Microphone access denied by governance policy (enable_microphone = false)".into(),
             );

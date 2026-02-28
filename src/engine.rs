@@ -116,22 +116,8 @@ impl AudioEngine {
 
         thread::spawn(move || {
             let thread_tx = internal_tx;
-            let audio_resource = OutputStream::try_default();
-            let _stream_ownership;
-            let stream_handle: Option<OutputStreamHandle> = match audio_resource {
-                Ok((s, h)) => {
-                    _stream_ownership = Some(s);
-                    Some(h)
-                }
-                Err(e) => {
-                    eprintln!(
-                        "Audio Thread: No audio output device: {}. Headless mode.",
-                        e
-                    );
-                    _stream_ownership = None;
-                    None
-                }
-            };
+            let mut _stream_ownership = None;
+            let mut stream_handle: Option<OutputStreamHandle> = None;
 
             let mut current_volume: f32 =
                 crate::config_loader::read_settings(|s| s.playback_volume, 1.0);
@@ -155,11 +141,33 @@ impl AudioEngine {
                     }
                 }
 
+                // Drop rodio stream to save CPU when idle
+                if active_sinks.is_empty() && _stream_ownership.is_some() {
+                    _stream_ownership = None;
+                    stream_handle = None;
+                }
+
                 let msg = match msg_result {
                     Ok(m) => m,
                     Err(RecvTimeoutError::Timeout) => continue,
                     Err(RecvTimeoutError::Disconnected) => break,
                 };
+
+                // Helper to initialize rodio on demand
+                if stream_handle.is_none() {
+                    match OutputStream::try_default() {
+                        Ok((s, h)) => {
+                            _stream_ownership = Some(s);
+                            stream_handle = Some(h);
+                        }
+                        Err(e) => {
+                            eprintln!(
+                                "Audio Thread: No audio output device: {}. Headless mode.",
+                                e
+                            );
+                        }
+                    }
+                }
 
                 match msg {
                     AudioMessage::PlayData {

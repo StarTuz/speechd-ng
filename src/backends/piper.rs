@@ -192,23 +192,34 @@ impl SpeechBackend for PiperBackend {
     }
 
     fn synthesize(&self, text: &str, voice: Option<&str>) -> Result<Vec<u8>> {
+        // Use first available model as default if none specified
         let voice_id = voice.unwrap_or("en_US-lessac-medium");
 
-        let (onnx_path, _config_path) = self.find_model_files(voice_id).ok_or_else(|| {
-            Error::new(
-                ErrorKind::NotFound,
-                format!(
-                    "Piper model not found locally for voice: {}. Please download it first.",
-                    voice_id
-                ),
-            )
-        })?;
+        let (onnx_path, _config_path) = self.find_model_files(voice_id)
+            .or_else(|| {
+                // Fall back to first available model
+                let fallback = std::fs::read_dir(&self.models_dir).ok()?.flatten()
+                    .find(|e| e.path().extension().and_then(|s| s.to_str()) == Some("onnx"))
+                    .and_then(|e| {
+                        let onnx = e.path();
+                        let json = onnx.with_extension("onnx.json");
+                        if json.exists() { Some((onnx, json)) } else { None }
+                    })?;
+                eprintln!(
+                    "piper-tts: voice '{}' not found, falling back to '{}'",
+                    voice_id,
+                    fallback.0.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown")
+                );
+                Some(fallback)
+            })
+            .ok_or_else(|| Error::new(ErrorKind::NotFound,
+                format!("No piper-tts voice model found in {:?}. Download one with: speechd-control download-voice <name>", self.models_dir)))?;
 
         let mut child = Command::new(&self.binary_path)
             .arg("-m")
             .arg(&onnx_path)
-            .arg("--output_file")
-            .arg("-") // Output WAV to stdout
+            .arg("-f")
+            .arg("/dev/stdout") // piper-tts writes WAV to file path; /dev/stdout gives us stdout
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

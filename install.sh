@@ -415,7 +415,7 @@ global_audio_buffer_limit_mb = 200
 
 # TTS
 tts_backend = "piper-tts"
-piper_model = "en_US-lessac-medium"
+piper_model = "$(find "$HOME/.local/share/piper/models" -name "*.onnx" 2>/dev/null | head -1 | xargs basename 2>/dev/null | sed 's/\.onnx$//' || echo 'en_US-lessac-medium')"
 piper_binary = "piper-tts"
 
 # STT & Wake Word

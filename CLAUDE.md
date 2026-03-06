@@ -83,6 +83,10 @@ Two core traits define the pluggable backend system:
 
 Config lives at `~/.config/speechd-ng/Speech.toml`. Key settings: `ai_backend` (default `"bitnet"`; also `"ollama"` or `"auto"`), `tts_backend` (`"piper-tts"`/`"espeak"`), `stt_backend` (`"vosk"`/`"wyoming"`/`"whisper"`). Privacy features (`enable_microphone`, `enable_wake_word`) default to `false`; `enable_ai` defaults to `true`. Settings can also be overridden via `SPEECH_*` environment variables (e.g. `SPEECH_OLLAMA_URL`).
 
+**No hot-reload.** `SETTINGS` is a `lazy_static! RwLock<Settings>` loaded once at startup. Config file changes require `systemctl --user restart speechd-ng`. There is no D-Bus `Reload` method yet (planned).
+
+**piper-tts voice resolution** (`src/backends/piper.rs`): `piper_model` is read from live `SETTINGS` on every `speak()` call (so changes take effect after restart). Synthesizer tries exact filename match in `~/.local/share/piper/models/`, then falls back to first available `.onnx`+`.onnx.json` pair with a warning logged to stderr. No model installed → clear `NotFound` error with the install command. `piper_binary` is cached at daemon startup only.
+
 ## Guardrails (from GUARDRAILS.md)
 
 These are **non-negotiable**:

@@ -32,6 +32,28 @@ impl SpeechService {
         env!("CARGO_PKG_VERSION").to_string()
     }
 
+    #[zbus(name = "Reload")]
+    async fn reload(&self) -> zbus::fdo::Result<String> {
+        match config_loader::Settings::new() {
+            Ok(new_settings) => {
+                let new_tts = new_settings.rate_limit_tts;
+                let new_ai = new_settings.rate_limit_ai;
+                let new_audio = new_settings.rate_limit_audio;
+                let new_listen = new_settings.rate_limit_listen;
+                match config_loader::try_write_settings(|s| *s = new_settings) {
+                    Ok(_) => {
+                        self.rate_limiter
+                            .update_limits(new_tts, new_ai, new_audio, new_listen);
+                        println!("Config reloaded");
+                        Ok("Config reloaded".to_string())
+                    }
+                    Err(e) => Err(zbus::fdo::Error::Failed(e.to_string())),
+                }
+            }
+            Err(e) => Err(zbus::fdo::Error::Failed(format!("Invalid config: {}", e))),
+        }
+    }
+
     // ─── TTS ───
 
     #[zbus(name = "Speak")]

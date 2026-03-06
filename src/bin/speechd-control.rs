@@ -117,6 +117,9 @@ enum Commands {
 
     /// List audio output devices
     Sinks,
+
+    /// Reload config from disk without restarting
+    Reload,
 }
 
 #[derive(Subcommand)]
@@ -507,6 +510,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
+        }
+
+        Commands::Reload => {
+            let result: String = conn
+                .call_method(Some(dest), path, Some(iface), "Reload", &())?
+                .body()
+                .deserialize()?;
+            println!("{}", result);
         }
 
         Commands::Sinks => {

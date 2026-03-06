@@ -6,6 +6,7 @@ After=graphical-session.target
 [Service]
 Type=simple
 ExecStart=%h/.local/bin/speechd-ng
+ExecReload=%h/.local/bin/speechd-control reload
 Restart=on-failure
 BusName=org.speech.Service
 Environment=RUST_LOG=info

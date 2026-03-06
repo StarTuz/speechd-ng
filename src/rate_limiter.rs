@@ -52,32 +52,44 @@ pub enum LimitType {
 pub struct RateLimiter {
     /// Map of (sender, limit_type) -> TokenBucket
     buckets: Mutex<HashMap<(String, LimitType), TokenBucket>>,
-    /// Limits per minute for each type
-    tts_per_minute: f32,
-    ai_per_minute: f32,
-    audio_per_minute: f32,
-    listen_per_minute: f32,
+    /// Limits per minute for each type (wrapped so they can be updated at runtime)
+    limits: Mutex<(f32, f32, f32, f32)>, // (tts, ai, audio, listen)
 }
 
 impl RateLimiter {
     pub fn new(tts: u32, ai: u32, audio: u32, listen: u32) -> Self {
         Self {
             buckets: Mutex::new(HashMap::new()),
-            tts_per_minute: tts as f32,
-            ai_per_minute: ai as f32,
-            audio_per_minute: audio as f32,
-            listen_per_minute: listen as f32,
+            limits: Mutex::new((tts as f32, ai as f32, audio as f32, listen as f32)),
         }
+    }
+
+    /// Update rate limits at runtime (e.g. after config reload).
+    /// Existing in-flight buckets keep their current token counts but will
+    /// refill at the new rate from the next check onward.
+    pub fn update_limits(&self, tts: u32, ai: u32, audio: u32, listen: u32) {
+        let mut l = self.limits.lock().unwrap_or_else(|p| p.into_inner());
+        *l = (tts as f32, ai as f32, audio as f32, listen as f32);
+        // Clear existing buckets so new max_tokens takes effect immediately.
+        self.buckets
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clear();
+    }
+
+    fn limits_snapshot(&self) -> (f32, f32, f32, f32) {
+        *self.limits.lock().unwrap_or_else(|p| p.into_inner())
     }
 
     /// Check if request is allowed, consuming a token if so
     /// Returns true if allowed, false if rate limited
     pub fn check(&self, sender: &str, limit_type: LimitType) -> bool {
+        let (tts, ai, audio, listen) = self.limits_snapshot();
         let limit = match limit_type {
-            LimitType::Tts => self.tts_per_minute,
-            LimitType::Ai => self.ai_per_minute,
-            LimitType::Audio => self.audio_per_minute,
-            LimitType::Listen => self.listen_per_minute,
+            LimitType::Tts => tts,
+            LimitType::Ai => ai,
+            LimitType::Audio => audio,
+            LimitType::Listen => listen,
         };
 
         // Use burst size = 1 minute worth
@@ -96,13 +108,18 @@ impl RateLimiter {
     /// Get remaining tokens for a sender/type (for debugging/info)
     #[allow(dead_code)]
     pub fn remaining(&self, sender: &str, limit_type: LimitType) -> f32 {
+        let (tts, ai, audio, listen) = self.limits_snapshot();
+        let default = match limit_type {
+            LimitType::Tts => tts,
+            LimitType::Ai => ai,
+            LimitType::Audio => audio,
+            LimitType::Listen => listen,
+        };
         let buckets = self.buckets.lock().unwrap_or_else(|p| p.into_inner());
-        let key = (sender.to_string(), limit_type);
-
         buckets
-            .get(&key)
+            .get(&(sender.to_string(), limit_type))
             .map(|b| b.tokens)
-            .unwrap_or(self.tts_per_minute)
+            .unwrap_or(default)
     }
 
     /// Clean up old entries (senders not seen recently)
@@ -116,7 +133,7 @@ impl RateLimiter {
 
 impl Default for RateLimiter {
     fn default() -> Self {
-        Self::new(30, 10, 20, 30) // Default limits per minute
+        Self::new(30, 10, 20, 30)
     }
 }
 

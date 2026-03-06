@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Arc::new(chronicler::Chronicler::new(&db_path).expect("Failed to initialize Chronicler"))
     };
 
-    // Auto-start BitNet if configured
+    // Auto-start BitNet if configured, then wait for it to be ready
     {
         let settings = config_loader::SETTINGS.read().unwrap();
         let should_start = settings.bitnet_auto_start
@@ -53,22 +53,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         if should_start {
             let probe_url = format!("{}/v1/models", bitnet_url.trim_end_matches('/'));
-            let alive = reqwest::Client::builder()
+            let client = reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(2))
                 .build()
-                .ok()
-                .map(|c| c.get(&probe_url).send());
+                .unwrap_or_default();
 
-            let already_running = if let Some(fut) = alive {
-                fut.await.map(|r| r.status().is_success()).unwrap_or(false)
-            } else {
-                false
-            };
+            // Quick check: already up (e.g. started externally or by a previous run)
+            let already_running = client
+                .get(&probe_url)
+                .send()
+                .await
+                .map(|r| r.status().is_success())
+                .unwrap_or(false);
 
             if already_running {
-                println!("BitNet: already running at {}", bitnet_url);
+                println!("BitNet: ready at {}", bitnet_url);
             } else {
-                println!("BitNet: not reachable, starting via systemctl...");
+                // systemd Wants= starts it before us, but llama-server needs time to load
+                // the model. Try systemctl as a fallback for non-systemd setups, then wait.
                 let user_ok = std::process::Command::new("systemctl")
                     .args(["--user", "start", "bitnet"])
                     .status()
@@ -78,6 +80,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     let _ = std::process::Command::new("systemctl")
                         .args(["start", "bitnet"])
                         .status();
+                }
+
+                // Wait up to 60 s for llama-server to finish loading the model
+                println!("BitNet: waiting for model to load...");
+                let mut ready = false;
+                for attempt in 1..=30 {
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    if client
+                        .get(&probe_url)
+                        .send()
+                        .await
+                        .map(|r| r.status().is_success())
+                        .unwrap_or(false)
+                    {
+                        println!("BitNet: ready after {}s", attempt * 2);
+                        ready = true;
+                        break;
+                    }
+                }
+                if !ready {
+                    println!("BitNet: did not become ready within 60s — AI requests will fail until it starts");
                 }
             }
         }

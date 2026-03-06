@@ -260,6 +260,124 @@ if [ "$SKIP_CONFIG" != "true" ]; then
             ;;
     esac
 
+    # BitNet setup — fully automatic, no user input required
+    BITNET_WORKDIR="$HOME/bitnet"
+    BITNET_BIN="llama-server"
+    BITNET_MODEL_REL="models/bitnet_b1_58-3B-Q4_K_M.gguf"
+
+    install_bitnet() {
+        mkdir -p "$BITNET_WORKDIR/models"
+
+        # --- llama-server ---
+        if command -v llama-server &>/dev/null; then
+            BITNET_BIN=$(command -v llama-server)
+            echo "[*] llama-server found: $BITNET_BIN"
+        else
+            echo "[*] Installing llama-server..."
+
+            # Try package manager first (silent — don't spam output on failure)
+            local pkg_ok=false
+            if command -v pacman &>/dev/null; then
+                sudo pacman -S --noconfirm llama-cpp &>/dev/null && pkg_ok=true
+            elif command -v apt-get &>/dev/null; then
+                sudo apt-get install -y llama-cpp &>/dev/null && pkg_ok=true
+            elif command -v dnf &>/dev/null; then
+                sudo dnf install -y llama-cpp &>/dev/null && pkg_ok=true
+            fi
+
+            if $pkg_ok && command -v llama-server &>/dev/null; then
+                BITNET_BIN=$(command -v llama-server)
+                echo "[*] llama-server installed via package manager"
+            else
+                # Auto-detect GPU → pick Vulkan or CPU build
+                local variant="cpu-avx2"
+                if nvidia-smi &>/dev/null 2>&1 || \
+                   (command -v vulkaninfo &>/dev/null && vulkaninfo &>/dev/null 2>&1); then
+                    variant="vulkan"
+                    echo "[*] GPU detected — downloading Vulkan build"
+                else
+                    echo "[*] No GPU detected — downloading CPU build"
+                fi
+
+                local tag
+                tag=$(curl -sf "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest" \
+                    | grep '"tag_name"' | cut -d'"' -f4)
+                [ -z "$tag" ] && { echo "[!] Cannot reach GitHub."; return 1; }
+                echo "[*] Downloading llama-server $tag..."
+
+                local url="https://github.com/ggml-org/llama.cpp/releases/download/${tag}/llama-${tag}-bin-ubuntu-${variant}-x64.tar.gz"
+                local tmp
+                tmp=$(mktemp -d)
+                if ! curl -L --progress-bar -o "$tmp/llama.tar.gz" "$url"; then
+                    echo "[!] Download failed."; rm -rf "$tmp"; return 1
+                fi
+                tar -xzf "$tmp/llama.tar.gz" -C "$tmp"
+
+                local found_bin
+                found_bin=$(find "$tmp" -name "llama-server" -type f | head -n1)
+                [ -z "$found_bin" ] && { echo "[!] llama-server not found in archive."; rm -rf "$tmp"; return 1; }
+
+                cp "$found_bin" "$BIN_DIR/llama-server"
+                chmod +x "$BIN_DIR/llama-server"
+                # Co-locate .so files — ggml dlopen()s backends from the binary's directory
+                find "$tmp" -name "*.so*" -type f -exec cp {} "$BIN_DIR/" \;
+                rm -rf "$tmp"
+                BITNET_BIN="$BIN_DIR/llama-server"
+
+                # Verify no missing libs
+                local missing
+                missing=$(ldd "$BITNET_BIN" 2>/dev/null | grep "not found" || true)
+                if [ -n "$missing" ]; then
+                    echo "[!] llama-server has unresolved libraries:"
+                    echo "$missing"
+                    return 1
+                fi
+                echo "[*] llama-server installed: $BITNET_BIN"
+            fi
+        fi
+
+        # --- BitNet model ---
+        local model_abs="$BITNET_WORKDIR/$BITNET_MODEL_REL"
+        if [ -f "$model_abs" ]; then
+            echo "[*] Model already present."
+            return 0
+        fi
+
+        echo "[*] Downloading BitNet model (~2.3 GB)..."
+        # larenspear's repo — verified compatible with llama-server b8209+
+        local hf_repo="larenspear/bitnet_b1_58-3B-GGUF"
+        local filename
+        filename=$(curl -sf "https://huggingface.co/api/models/${hf_repo}" | \
+            python3 -c '
+import sys, json
+data = json.load(sys.stdin)
+files = [s["rfilename"] for s in data.get("siblings", []) if s["rfilename"].endswith(".gguf")]
+for q in ["q4_k_m", "q4_k_s", "q4_0"]:
+    for f in files:
+        if q in f.lower():
+            print(f); exit(0)
+' 2>/dev/null) || true
+
+        [ -z "$filename" ] && { echo "[!] Could not find a compatible model."; return 1; }
+
+        local model_url="https://huggingface.co/${hf_repo}/resolve/main/${filename}"
+        BITNET_MODEL_REL="models/$(basename "$filename")"
+        model_abs="$BITNET_WORKDIR/$BITNET_MODEL_REL"
+        echo "[*] Fetching $(basename "$filename")..."
+        if ! curl -L --progress-bar -o "$model_abs" "$model_url"; then
+            rm -f "$model_abs"
+            echo "[!] Model download failed."
+            return 1
+        fi
+        echo "[*] Model ready."
+    }
+
+    if [[ "$AI_BACKEND" == "bitnet" || "$AI_BACKEND" == "auto" ]]; then
+        echo ""
+        echo "--- BitNet Setup ---"
+        install_bitnet || echo "[!] BitNet setup failed — AI features will use Ollama fallback."
+    fi
+
     echo ""
     echo "--- Speech to Text ---"
     echo "1) Vosk (Local)"
@@ -296,9 +414,9 @@ max_audio_size_mb = 50
 global_audio_buffer_limit_mb = 200
 
 # TTS
-tts_backend = "piper"
+tts_backend = "piper-tts"
 piper_model = "en_US-lessac-medium"
-piper_binary = "piper"
+piper_binary = "piper-tts"
 
 # STT & Wake Word
 stt_backend = "$STT_BACKEND"
@@ -344,24 +462,145 @@ mkdir -p "$HOME/.local/share/piper/models"
 mkdir -p "$HOME/.local/share/speechd-ng"
 mkdir -p "$HOME/.cache/vosk"
 
+# Read AI_BACKEND from existing config if it was not set interactively
+if [ -z "${AI_BACKEND:-}" ] && [ -f "$CONFIG_FILE" ]; then
+    AI_BACKEND=$(grep '^ai_backend' "$CONFIG_FILE" | cut -d'"' -f2)
+fi
+
+# Only (re)write the BitNet service file when we did interactive setup
+if [ "${SKIP_CONFIG:-false}" != "true" ] && [[ "${AI_BACKEND:-}" == "bitnet" || "${AI_BACKEND:-}" == "auto" ]]; then
+    echo "[*] Installing BitNet service unit..."
+    cat > "$SYSTEMD_DIR/bitnet.service" <<EOF
+[Unit]
+Description=BitNet Inference Server (OpenAI-compatible API)
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=${BITNET_WORKDIR}
+ExecStart=${BITNET_BIN} -m ${BITNET_MODEL_REL} --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=120
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
+EOF
+fi
+
+# Chain BitNet to start with speechd-ng if it is the selected backend
+DROPIN_DIR="$SYSTEMD_DIR/speechd-ng.service.d"
+DROPIN_FILE="$DROPIN_DIR/bitnet-chain.conf"
+if [[ "${AI_BACKEND:-}" == "bitnet" || "${AI_BACKEND:-}" == "auto" ]]; then
+    echo "[*] Chaining BitNet to speechd-ng startup..."
+    mkdir -p "$DROPIN_DIR"
+    cat > "$DROPIN_FILE" <<'DROPIN'
+[Unit]
+Wants=bitnet.service
+After=bitnet.service
+DROPIN
+    systemctl --user enable bitnet 2>/dev/null || true
+else
+    if [ -f "$DROPIN_FILE" ]; then
+        rm -f "$DROPIN_FILE"
+        rmdir --ignore-fail-on-non-empty "$DROPIN_DIR"
+    fi
+fi
+
 echo "[*] Enabling services..."
 systemctl --user daemon-reload
 systemctl --user enable --now speechd-ng
 
-if [ "$VISION_INSTALLED" = true ]; then
+if [ "${VISION_INSTALLED:-false}" = true ]; then
     systemctl --user enable speechd-vision
     echo "    Vision service enabled (start with: systemctl --user start speechd-vision)"
 fi
 
+# ============================================================================
+# Smoke Tests
+# ============================================================================
+echo ""
+echo "--- Verifying Installation ---"
+TESTS_PASSED=0
+TESTS_FAILED=0
+
+smoke_pass() { echo "  PASS: $1"; ((TESTS_PASSED++)); }
+smoke_fail() { echo "  FAIL: $1"; ((TESTS_FAILED++)); }
+
+# Test 1: speechd-ng binary exists
+if [ -x "$BIN_DIR/speechd-ng" ]; then
+    smoke_pass "speechd-ng binary installed"
+else
+    smoke_fail "speechd-ng binary missing at $BIN_DIR/speechd-ng"
+fi
+
+# Test 2: speechd-ng service is active
+sleep 1
+if systemctl --user is-active --quiet speechd-ng; then
+    smoke_pass "speechd-ng.service is active"
+else
+    smoke_fail "speechd-ng.service is not active"
+    systemctl --user status speechd-ng --no-pager -n 5 2>/dev/null || true
+fi
+
+# Test 3: D-Bus name registered
+if dbus-send --session --print-reply --dest=org.freedesktop.DBus \
+    /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null \
+    | grep -q "org.speech.Service"; then
+    smoke_pass "org.speech.Service registered on D-Bus"
+else
+    smoke_fail "org.speech.Service not found on D-Bus"
+fi
+
+# Test 4: TTS smoke test
+if "$BIN_DIR/speechd-control" speak "Installation complete" 2>/dev/null; then
+    smoke_pass "TTS spoke successfully"
+else
+    smoke_fail "TTS failed (check piper-tts is installed)"
+fi
+
+# Test 5: llama-server (only if BitNet is selected and we installed it)
+if [[ "${AI_BACKEND:-}" == "bitnet" || "${AI_BACKEND:-}" == "auto" ]]; then
+    LLAMA_BIN="${BITNET_BIN:-$BIN_DIR/llama-server}"
+    if [ -x "$LLAMA_BIN" ]; then
+        MISSING=$(LD_LIBRARY_PATH="${HOME}/.local/lib" ldd "$LLAMA_BIN" 2>/dev/null | grep "not found" || true)
+        if [ -n "$MISSING" ]; then
+            smoke_fail "llama-server has missing libraries: $(echo "$MISSING" | tr '\n' ' ')"
+        else
+            smoke_pass "llama-server shared libraries OK"
+        fi
+    else
+        smoke_fail "llama-server binary not found at $LLAMA_BIN"
+    fi
+
+    # Test 6: bitnet.service starts and stays up
+    systemctl --user restart bitnet 2>/dev/null || true
+    sleep 5
+    if systemctl --user is-active --quiet bitnet; then
+        smoke_pass "bitnet.service is active"
+    else
+        STATUS=$(systemctl --user status bitnet --no-pager -n 3 2>/dev/null | tail -3)
+        smoke_fail "bitnet.service failed to stay active: $STATUS"
+    fi
+fi
+
 echo ""
 echo "========================================"
-echo "   Installation Complete!"
+if [ "$TESTS_FAILED" -eq 0 ]; then
+    echo "   Installation Complete! ($TESTS_PASSED/$TESTS_PASSED tests passed)"
+else
+    echo "   Installation done with warnings ($TESTS_PASSED passed, $TESTS_FAILED failed)"
+fi
 echo "========================================"
 echo ""
 echo "Installed:"
 echo "  - speechd-ng (core daemon) - RUNNING"
 echo "  - speechd-control (CLI)"
-if [ "$VISION_INSTALLED" = true ]; then
+if [ "${VISION_INSTALLED:-false}" = true ]; then
 echo "  - speechd-vision (The Eye) - ENABLED"
 fi
 echo ""
@@ -369,14 +608,14 @@ echo "Commands:"
 echo "  speechd-control speak 'Hello world'"
 echo "  speechd-control listen"
 echo "  speechd-control think 'What is the meaning of life?'"
-if [ "$VISION_INSTALLED" = true ]; then
+if [ "${VISION_INSTALLED:-false}" = true ]; then
 echo "  speechd-control describe 'What do you see?'"
 fi
 echo ""
 echo "Services:"
 echo "  systemctl --user status speechd-ng"
 echo "  systemctl --user restart speechd-ng"
-if [ "$VISION_INSTALLED" = true ]; then
+if [ "${VISION_INSTALLED:-false}" = true ]; then
 echo "  systemctl --user start speechd-vision"
 fi
 echo ""

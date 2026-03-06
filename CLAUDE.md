@@ -47,13 +47,15 @@ cargo fmt
 
 | Module | Role |
 |--------|------|
-| `service.rs` | D-Bus interface implementation — all API methods live here |
+| `service.rs` | D-Bus interface implementation — all API methods live here (zbus `#[interface]`, one impl block) |
+| `service_helpers/` | Logic extracted from `service.rs`: `guards.rs` (Polkit + rate limit), `brain.rs` (AI management), `audio_devices.rs` (wpctl parsing) |
 | `engine.rs` | Audio output engine (actor pattern with message queue, uses rodio) |
 | `ear.rs` | Audio input: microphone capture (cpal), VAD state machine, wake word detection |
 | `cortex.rs` | AI dispatcher: async actor with message channel, short-term memory, prompt sanitization |
 | `chronicler.rs` | Long-term memory: sled vector DB with optional BERT embeddings, fallback keyword matching |
 | `fingerprint.rs` | Voice learning: stores correction patterns, passive learning from LLM |
-| `config_loader.rs` | TOML config from `~/.config/speechd-ng/Speech.toml`, lazy_static `SETTINGS` global |
+| `config_loader.rs` | TOML config from `~/.config/speechd-ng/Speech.toml`, lazy_static `SETTINGS` global; also overrideable via `SPEECH_*` env vars |
+| `error.rs` | `SpeechdError` enum — unified error type for all AI and backend operations |
 | `rate_limiter.rs` | Per-sender token bucket rate limiting |
 | `security.rs` | Polkit authorization for sensitive operations |
 | `ssip.rs` | Speech Dispatcher protocol compatibility shim |
@@ -66,12 +68,12 @@ cargo fmt
 Two core traits define the pluggable backend system:
 
 - **`BrainBackend`** (async_trait): `prompt()` and `stream()` — implemented by `ollama.rs`, `openai.rs`, `fallback.rs`
-- **`SpeechBackend`**: `synthesize()` and `list_voices()` — implemented by `piper.rs`, `espeak.rs`
+- **`SpeechBackend`**: `synthesize()` and `list_voices()` — implemented by `piper.rs` (key: `"piper-tts"`), `espeak.rs`
 - `whisper.rs` provides native Whisper STT
 
 ### Data Flow
 
-1. D-Bus method call → `service.rs` (rate limit + Polkit check)
+1. D-Bus method call → `service.rs` → `service_helpers/guards.rs` (rate limit + Polkit check)
 2. TTS: `service.rs` → `engine.rs` actor → `SpeechBackend` (Piper/eSpeak) → rodio playback
 3. AI: `service.rs` → `cortex.rs` actor → `BrainBackend` (Ollama/OpenAI) → response
 4. STT: `ear.rs` VAD → Vosk/Wyoming/Whisper → transcribed text
@@ -79,7 +81,7 @@ Two core traits define the pluggable backend system:
 
 ### Configuration
 
-Config lives at `~/.config/speechd-ng/Speech.toml`. Key settings: `ai_backend` ("ollama"/"bitnet"/"auto"), `tts_backend` ("piper"/"espeak"), `stt_backend` ("vosk"/"wyoming"/"whisper"). Privacy features (`enable_microphone`, `enable_wake_word`, `enable_ai`) default to `false`.
+Config lives at `~/.config/speechd-ng/Speech.toml`. Key settings: `ai_backend` (default `"bitnet"`; also `"ollama"` or `"auto"`), `tts_backend` (`"piper-tts"`/`"espeak"`), `stt_backend` (`"vosk"`/`"wyoming"`/`"whisper"`). Privacy features (`enable_microphone`, `enable_wake_word`) default to `false`; `enable_ai` defaults to `true`. Settings can also be overridden via `SPEECH_*` environment variables (e.g. `SPEECH_OLLAMA_URL`).
 
 ## Guardrails (from GUARDRAILS.md)
 

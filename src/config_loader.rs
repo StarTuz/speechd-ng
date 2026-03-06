@@ -67,7 +67,7 @@ impl Default for Settings {
             enable_vision: false,
             passive_confidence_threshold: 0.1,
             piper_model: "en_US-lessac-medium".to_string(),
-            piper_binary: "piper".to_string(),
+            piper_binary: "piper-tts".to_string(),
             tts_backend: "espeak".to_string(),
             memory_size: 50,
             enable_rag: true,
@@ -155,7 +155,7 @@ impl Settings {
             .set_default("enable_vision", false)?
             .set_default("passive_confidence_threshold", 0.1)?
             .set_default("piper_model", "en_US-lessac-medium")?
-            .set_default("piper_binary", "piper")?
+            .set_default("piper_binary", "piper-tts")?
             .set_default("tts_backend", "espeak")?
             .set_default("memory_size", 50)?
             .set_default("enable_rag", true)?

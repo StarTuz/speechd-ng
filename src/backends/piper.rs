@@ -18,7 +18,7 @@ impl PiperBackend {
         let binary_path = crate::config_loader::SETTINGS
             .read()
             .map(|s| s.piper_binary.clone())
-            .unwrap_or_else(|_| "piper".to_string());
+            .unwrap_or_else(|_| "piper-tts".to_string());
 
         Self {
             binary_path,

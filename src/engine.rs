@@ -106,7 +106,7 @@ impl AudioEngine {
 
         let mut backends_map: HashMap<String, Arc<dyn SpeechBackend>> = HashMap::new();
         backends_map.insert("espeak".to_string(), Arc::new(EspeakBackend::new()));
-        backends_map.insert("piper".to_string(), Arc::new(PiperBackend::new()));
+        backends_map.insert("piper-tts".to_string(), Arc::new(PiperBackend::new()));
         let backends = Arc::new(backends_map);
         let total_audio_buffer_size = Arc::new(AtomicUsize::new(0));
 
@@ -252,7 +252,7 @@ impl AudioEngine {
                             let parts: Vec<&str> = full_id.splitn(2, ':').collect();
                             (parts[0], parts[1])
                         } else {
-                            ("piper", full_id.as_str())
+                            ("piper-tts", full_id.as_str())
                         };
                         if let Some(backend) = backends_worker_clone.get(target) {
                             let _ = resp_tx.send(backend.download_voice(voice));
@@ -530,8 +530,8 @@ impl AudioEngine {
                 ("en_US-lessac-medium".to_string(), "espeak".to_string()),
             );
             let (target, actual_v) = if let Some(ref v) = voice {
-                if v.starts_with("piper:") {
-                    ("piper".to_string(), Some(v[6..].to_string()))
+                if v.starts_with("piper-tts:") {
+                    ("piper-tts".to_string(), Some(v[9..].to_string()))
                 } else if v.starts_with("espeak:") {
                     ("espeak".to_string(), Some(v[7..].to_string()))
                 } else {
@@ -541,7 +541,7 @@ impl AudioEngine {
                 (default, None)
             };
             if let Some(backend) = backends.get(&target) {
-                let v_id = actual_v.or_else(|| if target == "piper" { Some(piper) } else { None });
+                let v_id = actual_v.or_else(|| if target == "piper-tts" { Some(piper) } else { None });
                 let res = tokio::task::spawn_blocking({
                     let backend = backend.clone();
                     let t = text.clone();
@@ -572,8 +572,8 @@ impl AudioEngine {
                 ("en_US-lessac-medium".to_string(), "espeak".to_string()),
             );
             let (target, actual_v) = if let Some(ref v) = voice {
-                if v.starts_with("piper:") {
-                    ("piper".to_string(), Some(v[6..].to_string()))
+                if v.starts_with("piper-tts:") {
+                    ("piper-tts".to_string(), Some(v[9..].to_string()))
                 } else if v.starts_with("espeak:") {
                     ("espeak".to_string(), Some(v[7..].to_string()))
                 } else {
@@ -583,7 +583,7 @@ impl AudioEngine {
                 (default, None)
             };
             if let Some(backend) = backends.get(&target) {
-                let v_id = actual_v.or_else(|| if target == "piper" { Some(piper) } else { None });
+                let v_id = actual_v.or_else(|| if target == "piper-tts" { Some(piper) } else { None });
                 let res = tokio::task::spawn_blocking({
                     let backend = backend.clone();
                     let t = text.clone();
@@ -663,8 +663,8 @@ impl AudioEngine {
                 ("en_US-lessac-medium".to_string(), "espeak".to_string()),
             );
             let (target, actual_v) = if let Some(ref v) = voice {
-                if v.starts_with("piper:") {
-                    ("piper".to_string(), Some(v[6..].to_string()))
+                if v.starts_with("piper-tts:") {
+                    ("piper-tts".to_string(), Some(v[9..].to_string()))
                 } else if v.starts_with("espeak:") {
                     ("espeak".to_string(), Some(v[7..].to_string()))
                 } else {
@@ -674,7 +674,7 @@ impl AudioEngine {
                 (default, None)
             };
             if let Some(backend) = backends.get(&target) {
-                let v_id = actual_v.or_else(|| if target == "piper" { Some(piper) } else { None });
+                let v_id = actual_v.or_else(|| if target == "piper-tts" { Some(piper) } else { None });
                 let res = tokio::task::spawn_blocking({
                     let backend = backend.clone();
                     let t = text.clone();

@@ -283,4 +283,32 @@ mod tests {
         let result = try_read_settings(|s| s.enable_ai);
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_try_write_settings_updates_value() {
+        // Record original
+        let original = read_settings(|s| s.memory_size, 0);
+
+        // Write a new value
+        try_write_settings(|s| s.memory_size = 999).unwrap();
+        let updated = read_settings(|s| s.memory_size, 0);
+        assert_eq!(updated, 999);
+
+        // Restore original so other tests are not affected
+        try_write_settings(|s| s.memory_size = original).unwrap();
+    }
+
+    #[test]
+    fn test_reload_rejects_invalid_config() {
+        // Directly validate that Settings::validate catches bad values —
+        // this mirrors what the Reload D-Bus method does before applying.
+        let mut s = Settings::default();
+        s.playback_volume = 2.0;
+        assert!(s.validate().is_err());
+
+        // A valid mutation should pass
+        let mut s = Settings::default();
+        s.memory_size = 100;
+        assert!(s.validate().is_ok());
+    }
 }

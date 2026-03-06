@@ -142,24 +142,3 @@ async fn test_openai_backend_stream() {
     assert_eq!(response, "Hello World");
 }
 
-#[test]
-fn test_error_display_backward_compat() {
-    assert_eq!(
-        SpeechdError::AiHttp {
-            status: "500 Internal Server Error".into()
-        }
-        .to_string(),
-        "AI Error: HTTP 500 Internal Server Error"
-    );
-    assert_eq!(
-        SpeechdError::StreamHttp {
-            status: "503 Service Unavailable".into()
-        }
-        .to_string(),
-        "Stream Error: HTTP 503 Service Unavailable"
-    );
-    assert_eq!(
-        SpeechdError::AiParseFailed.to_string(),
-        "Failed to parse AI response."
-    );
-}

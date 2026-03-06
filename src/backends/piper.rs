@@ -10,6 +10,14 @@ pub struct PiperBackend {
 }
 
 impl PiperBackend {
+    #[cfg(test)]
+    fn new_with_dir(models_dir: PathBuf) -> Self {
+        Self {
+            binary_path: "piper-tts".to_string(),
+            models_dir,
+        }
+    }
+
     pub fn new() -> Self {
         let models_dir = dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("/tmp"))
@@ -245,5 +253,125 @@ impl SpeechBackend for PiperBackend {
                 format!("Piper error: {}", err),
             ))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    fn make_model(dir: &std::path::Path, voice_id: &str, json: Option<&str>) {
+        fs::write(dir.join(format!("{}.onnx", voice_id)), b"fake onnx").unwrap();
+        if let Some(content) = json {
+            fs::write(dir.join(format!("{}.onnx.json", voice_id)), content).unwrap();
+        }
+    }
+
+    #[test]
+    fn test_find_model_files_exact_match() {
+        let dir = tempdir().unwrap();
+        make_model(dir.path(), "en_US-lessac-medium", Some("{}"));
+        let backend = PiperBackend::new_with_dir(dir.path().to_path_buf());
+        let result = backend.find_model_files("en_US-lessac-medium");
+        assert!(result.is_some());
+        let (onnx, json) = result.unwrap();
+        assert!(onnx.exists());
+        assert!(json.exists());
+    }
+
+    #[test]
+    fn test_find_model_files_missing_json_returns_none() {
+        let dir = tempdir().unwrap();
+        // Only .onnx, no .onnx.json
+        fs::write(dir.path().join("en_US-lessac-medium.onnx"), b"fake onnx").unwrap();
+        let backend = PiperBackend::new_with_dir(dir.path().to_path_buf());
+        assert!(backend.find_model_files("en_US-lessac-medium").is_none());
+    }
+
+    #[test]
+    fn test_find_model_files_unknown_voice_returns_none() {
+        let dir = tempdir().unwrap();
+        make_model(dir.path(), "en_US-lessac-medium", Some("{}"));
+        let backend = PiperBackend::new_with_dir(dir.path().to_path_buf());
+        assert!(backend.find_model_files("en_GB-semaine-medium").is_none());
+    }
+
+    #[test]
+    fn test_synthesize_no_models_returns_not_found() {
+        let dir = tempdir().unwrap();
+        let backend = PiperBackend::new_with_dir(dir.path().to_path_buf());
+        let err = backend.synthesize("hello", Some("en_US-lessac-medium")).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+        assert!(err.to_string().contains("speechd-control download-voice"));
+    }
+
+    #[test]
+    fn test_synthesize_empty_dir_not_found() {
+        let dir = tempdir().unwrap();
+        let backend = PiperBackend::new_with_dir(dir.path().to_path_buf());
+        let err = backend.synthesize("hello", None).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn test_list_voices_empty_dir() {
+        let dir = tempdir().unwrap();
+        let backend = PiperBackend::new_with_dir(dir.path().to_path_buf());
+        let voices = backend.list_voices().unwrap();
+        assert!(voices.is_empty());
+    }
+
+    #[test]
+    fn test_list_voices_nonexistent_dir() {
+        let backend = PiperBackend::new_with_dir(PathBuf::from("/tmp/no-such-dir-speechd-ng-test"));
+        let voices = backend.list_voices().unwrap();
+        assert!(voices.is_empty());
+    }
+
+    #[test]
+    fn test_list_voices_with_complete_model() {
+        let dir = tempdir().unwrap();
+        make_model(dir.path(), "en_US-lessac-medium", Some("{}"));
+        let backend = PiperBackend::new_with_dir(dir.path().to_path_buf());
+        let voices = backend.list_voices().unwrap();
+        assert_eq!(voices.len(), 1);
+        assert_eq!(voices[0].id, "en_US-lessac-medium");
+    }
+
+    #[test]
+    fn test_list_voices_onnx_without_json_still_listed() {
+        let dir = tempdir().unwrap();
+        // .onnx exists but no .json — still appears in list_voices with defaults
+        fs::write(dir.path().join("en_US-ryan-low.onnx"), b"fake").unwrap();
+        let backend = PiperBackend::new_with_dir(dir.path().to_path_buf());
+        let voices = backend.list_voices().unwrap();
+        assert_eq!(voices.len(), 1);
+        assert_eq!(voices[0].id, "en_US-ryan-low");
+        assert_eq!(voices[0].language, "unknown");
+    }
+
+    #[test]
+    fn test_parse_voice_metadata_extracts_language_and_quality() {
+        let dir = tempdir().unwrap();
+        let json = r#"{"audio": {"quality": "medium"}, "espeak": {"voice": "en-us"}}"#;
+        make_model(dir.path(), "en_US-lessac-medium", Some(json));
+        let backend = PiperBackend::new_with_dir(dir.path().to_path_buf());
+        let config_path = dir.path().join("en_US-lessac-medium.onnx.json");
+        let voice = backend.parse_voice_metadata(&config_path, "en_US-lessac-medium");
+        assert_eq!(voice.language, "en-us");
+        assert!(voice.name.contains("medium"));
+    }
+
+    #[test]
+    fn test_parse_voice_metadata_missing_fields_uses_defaults() {
+        let dir = tempdir().unwrap();
+        make_model(dir.path(), "en_US-lessac-medium", Some("{}"));
+        let backend = PiperBackend::new_with_dir(dir.path().to_path_buf());
+        let config_path = dir.path().join("en_US-lessac-medium.onnx.json");
+        let voice = backend.parse_voice_metadata(&config_path, "en_US-lessac-medium");
+        assert_eq!(voice.language, "unknown");
+        assert_eq!(voice.id, "en_US-lessac-medium");
     }
 }

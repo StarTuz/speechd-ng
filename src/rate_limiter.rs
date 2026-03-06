@@ -198,4 +198,25 @@ mod tests {
         // Should be approximately 4.0 (5 - 1, possibly slightly more from refill)
         assert!(remaining >= 3.9 && remaining <= 4.1);
     }
+
+    #[test]
+    fn test_update_limits_clears_existing_buckets_and_raises_cap() {
+        // Exhaust at limit=1
+        let limiter = RateLimiter::new(1, 10, 10, 10);
+        assert!(limiter.check("s", LimitType::Tts));
+        assert!(!limiter.check("s", LimitType::Tts));
+
+        // Raise limit — buckets are cleared, so sender gets a fresh bucket
+        limiter.update_limits(10, 10, 10, 10);
+        assert!(limiter.check("s", LimitType::Tts));
+    }
+
+    #[test]
+    fn test_update_limits_lowers_cap() {
+        // Start generous, consume none, then lower to 1
+        let limiter = RateLimiter::new(100, 100, 100, 100);
+        limiter.update_limits(1, 1, 1, 1);
+        assert!(limiter.check("s", LimitType::Ai));
+        assert!(!limiter.check("s", LimitType::Ai));
+    }
 }

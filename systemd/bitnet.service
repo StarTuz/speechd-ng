@@ -6,7 +6,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=%h/bitnet
-ExecStart=llama-server -m models/bitnet_b1_58-3B.gguf --host 127.0.0.1 --port 8000
+ExecStart=llama-server -m models/bitnet_b1_58-3B.gguf --host 127.0.0.1 --port 8000 -ngl 0
 # Uncomment if llama-server was installed from a prebuilt archive:
 # Environment=LD_LIBRARY_PATH=%h/.local/lib
 Restart=on-failure

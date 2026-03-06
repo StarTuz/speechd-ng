@@ -480,7 +480,7 @@ StartLimitBurst=3
 [Service]
 Type=simple
 WorkingDirectory=${BITNET_WORKDIR}
-ExecStart=${BITNET_BIN} -m ${BITNET_MODEL_REL} --host 127.0.0.1 --port 8000
+ExecStart=${BITNET_BIN} -m ${BITNET_MODEL_REL} --host 127.0.0.1 --port 8000 -ngl 0
 Restart=on-failure
 RestartSec=10
 TimeoutStartSec=120

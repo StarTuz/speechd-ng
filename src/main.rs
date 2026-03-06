@@ -43,7 +43,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Arc::new(chronicler::Chronicler::new(&db_path).expect("Failed to initialize Chronicler"))
     };
 
-    // Auto-start BitNet if configured, then wait for it to be ready
+    // Auto-start BitNet if configured. The fast path (already running) is checked
+    // synchronously; the slow path (model load wait) runs in a background task so
+    // D-Bus registration is never blocked.
     {
         let settings = config_loader::SETTINGS.read().unwrap();
         let should_start = settings.bitnet_auto_start
@@ -58,7 +60,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .build()
                 .unwrap_or_default();
 
-            // Quick check: already up (e.g. started externally or by a previous run)
+            // Quick check: already up (started externally or by systemd Wants=)
             let already_running = client
                 .get(&probe_url)
                 .send()
@@ -69,39 +71,41 @@ async fn main() -> Result<(), Box<dyn Error>> {
             if already_running {
                 println!("BitNet: ready at {}", bitnet_url);
             } else {
-                // systemd Wants= starts it before us, but llama-server needs time to load
-                // the model. Try systemctl as a fallback for non-systemd setups, then wait.
-                let user_ok = std::process::Command::new("systemctl")
-                    .args(["--user", "start", "bitnet"])
-                    .status()
-                    .map(|s| s.success())
-                    .unwrap_or(false);
-                if !user_ok {
-                    let _ = std::process::Command::new("systemctl")
-                        .args(["start", "bitnet"])
-                        .status();
-                }
-
-                // Wait up to 60 s for llama-server to finish loading the model
-                println!("BitNet: waiting for model to load...");
-                let mut ready = false;
-                for attempt in 1..=30 {
-                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                    if client
-                        .get(&probe_url)
-                        .send()
-                        .await
-                        .map(|r| r.status().is_success())
-                        .unwrap_or(false)
-                    {
-                        println!("BitNet: ready after {}s", attempt * 2);
-                        ready = true;
-                        break;
+                // Model is not up yet. Kick systemctl and poll in the background so
+                // D-Bus registration (below) is not delayed by the 60s load window.
+                println!("BitNet: starting in background (D-Bus service will be available immediately)...");
+                tokio::spawn(async move {
+                    let user_ok = std::process::Command::new("systemctl")
+                        .args(["--user", "start", "bitnet"])
+                        .status()
+                        .map(|s| s.success())
+                        .unwrap_or(false);
+                    if !user_ok {
+                        let _ = std::process::Command::new("systemctl")
+                            .args(["start", "bitnet"])
+                            .status();
                     }
-                }
-                if !ready {
-                    println!("BitNet: did not become ready within 60s — AI requests will fail until it starts");
-                }
+
+                    println!("BitNet: waiting for model to load...");
+                    let mut ready = false;
+                    for attempt in 1..=30 {
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                        if client
+                            .get(&probe_url)
+                            .send()
+                            .await
+                            .map(|r| r.status().is_success())
+                            .unwrap_or(false)
+                        {
+                            println!("BitNet: ready after {}s", attempt * 2);
+                            ready = true;
+                            break;
+                        }
+                    }
+                    if !ready {
+                        println!("BitNet: did not become ready within 60s — AI requests will fail until it starts");
+                    }
+                });
             }
         }
     }

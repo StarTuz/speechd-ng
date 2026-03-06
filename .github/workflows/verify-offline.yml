@@ -57,6 +57,8 @@ jobs:
         # Use simple echo for TOML to avoid indentation/sed issues
         echo 'ollama_url = "http://192.0.2.1:12345"' > ~/.config/speechd-ng/Speech.toml
         echo 'ollama_model = "void"' >> ~/.config/speechd-ng/Speech.toml
+        echo 'ai_backend = "ollama"' >> ~/.config/speechd-ng/Speech.toml
+        echo 'bitnet_auto_start = false' >> ~/.config/speechd-ng/Speech.toml
         echo 'enable_ai = true' >> ~/.config/speechd-ng/Speech.toml
         echo 'passive_confidence_threshold = 0.1' >> ~/.config/speechd-ng/Speech.toml
         echo 'piper_model = "en_US-lessac-medium"' >> ~/.config/speechd-ng/Speech.toml

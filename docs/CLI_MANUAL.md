@@ -93,15 +93,13 @@ speechd-control sinks
 
 ### AI Queries
 
-Ask the AI "Brain" a question (requires Ollama to be running).
+Ask the AI "Brain" a question.
 
 ```bash
 speechd-control think "What time is it in London?"
 ```
 
 ### Brain Management
-
-Control the underlying AI model (Ollama).
 
 ```bash
 # Check Brain status (online/offline, current model)
@@ -111,12 +109,113 @@ speechd-control brain
 speechd-control brain start
 speechd-control brain stop
 
-# Switch to a different model
+# Switch to a different Ollama model at runtime (no restart needed)
 speechd-control brain use llama3:latest
 speechd-control brain use mistral
 
-# Pull a new model
+# Pull a new Ollama model
 speechd-control brain pull gemma:2b
+```
+
+## Config Reload
+
+Apply changes from `~/.config/speechd-ng/Speech.toml` without restarting:
+
+```bash
+speechd-control reload
+# or via systemd:
+systemctl --user reload speechd-ng
+```
+
+Most settings take effect immediately. The only exception is `piper_binary`
+(the path to the piper-tts binary), which requires a full restart.
+
+---
+
+## Switching Models
+
+### TTS Voice (piper-tts)
+
+```bash
+# 1. Browse available voices
+speechd-control voices --remote
+
+# 2. Download the one you want
+speechd-control download piper-tts:en_GB-alba-medium
+
+# 3. Update your config
+#    Edit ~/.config/speechd-ng/Speech.toml:
+#      piper_model = "en_GB-alba-medium"
+
+# 4. Reload — no restart needed
+speechd-control reload
+
+# Verify: speak something to confirm the new voice
+speechd-control speak "Hello, this is the new voice"
+```
+
+Installed voices live in `~/.local/share/piper/models/`. If the configured
+model is not found, the daemon falls back to the first available voice and
+logs a warning to the journal.
+
+### AI Backend: BitNet (default)
+
+BitNet uses a GGUF model file in `~/bitnet/models/`. To switch models:
+
+```bash
+# 1. Download the new GGUF to ~/bitnet/models/
+#    (must be a BitNet-compatible GGUF from a repo like larenspear/bitnet_b1_58-3B-GGUF)
+cp /path/to/new-model.gguf ~/bitnet/models/
+
+# 2. Edit the systemd unit to point at the new file
+#    Edit ~/.config/systemd/user/bitnet.service, change -m in ExecStart:
+#      ExecStart=... -m models/new-model.gguf --host 127.0.0.1 --port 8000 -ngl 0
+
+# 3. Also update Speech.toml so the cortex knows the model name:
+#      bitnet_model = "models/new-model"
+
+# 4. Restart BitNet to load the new model
+systemctl --user daemon-reload
+systemctl --user restart bitnet
+
+# 5. Reload speechd-ng config (picks up new bitnet_model name)
+speechd-control reload
+```
+
+> **Note:** `-ngl 0` keeps all layers on CPU. BitNet 1-bit weights are
+> optimised for CPU inference — do not remove this flag or llama-server will
+> offload to GPU and consume several GB of VRAM for no throughput gain.
+
+### AI Backend: Ollama
+
+Ollama model switching is live — no restart required:
+
+```bash
+# Pull a model first (if not already downloaded)
+speechd-control brain pull llama3
+
+# Switch to it immediately
+speechd-control brain use llama3
+
+# Or edit Speech.toml and reload for a persistent change:
+#   ollama_model = "llama3"
+speechd-control reload
+```
+
+### Switching Between Backends (BitNet ↔ Ollama)
+
+Edit `~/.config/speechd-ng/Speech.toml`:
+
+```toml
+ai_backend = "bitnet"   # use BitNet (default, CPU-only, no Ollama needed)
+ai_backend = "ollama"   # use Ollama
+ai_backend = "auto"     # try BitNet first, fall back to Ollama
+```
+
+Then reload:
+
+```bash
+speechd-control reload
 ```
 
 ## Voice Recognition & Training (VAD)
